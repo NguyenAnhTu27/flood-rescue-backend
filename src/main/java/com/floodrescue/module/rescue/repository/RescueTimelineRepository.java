@@ -1,4 +1,18 @@
 package com.floodrescue.module.rescue.repository;
 
-public class RescueTimelineRepository {
+import com.floodrescue.module.rescue.entity.RescueRequestTimelineEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+
+public interface RescueTimelineRepository extends JpaRepository<RescueRequestTimelineEntity, Long> {
+
+    List<RescueRequestTimelineEntity> findByRescueRequestIdOrderByCreatedAtDesc(Long rescueRequestId);
+
+    Page<RescueRequestTimelineEntity> findByRescueRequestIdOrderByCreatedAtDesc(
+            Long rescueRequestId,
+            Pageable pageable
+    );
 }

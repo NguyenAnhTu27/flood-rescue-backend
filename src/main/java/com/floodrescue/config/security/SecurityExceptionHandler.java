@@ -16,6 +16,6 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint {
 
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write("{\"message\"😕\"Chưa đăng nhập hoặc token không hợp lệ\"}");
+        response.getWriter().write("{\"message\":\"Chưa đăng nhập hoặc token không hợp lệ\"}");
     }
 }

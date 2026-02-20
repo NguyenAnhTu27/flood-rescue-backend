@@ -6,10 +6,10 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class VerifyRequest {
+public class MarkDuplicateRequest {
 
-    @NotNull(message = "Trạng thái xác minh không được để trống")
-    private Boolean locationVerified;
+    @NotNull(message = "ID yêu cầu chính không được để trống")
+    private Long masterRequestId;
 
     private String note;
 }

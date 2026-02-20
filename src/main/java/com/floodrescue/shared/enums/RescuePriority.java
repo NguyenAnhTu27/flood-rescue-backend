@@ -1,4 +1,7 @@
 package com.floodrescue.shared.enums;
 
-public class RescuePriority {
+public enum RescuePriority {
+    HIGH,
+    MEDIUM,
+    LOW
 }

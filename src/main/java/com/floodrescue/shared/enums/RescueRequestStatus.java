@@ -1,4 +1,10 @@
 package com.floodrescue.shared.enums;
 
-public class RescueRequestStatus {
+public enum RescueRequestStatus {
+    PENDING,
+    VERIFIED,
+    IN_PROGRESS,
+    COMPLETED,
+    CANCELLED,
+    DUPLICATE
 }
