@@ -1,4 +1,7 @@
 package com.floodrescue.module.team.repository;
 
-public class TeamRepository {
+import com.floodrescue.module.team.entity.TeamEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface TeamRepository extends JpaRepository<TeamEntity, Long> {
 }

@@ -1,4 +1,13 @@
 package com.floodrescue.module.rescue.repository;
 
-public class TaskGroupRequestRepository {
+import com.floodrescue.module.rescue.entity.TaskGroupRequestEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+
+public interface TaskGroupRequestRepository extends JpaRepository<TaskGroupRequestEntity, TaskGroupRequestEntity.TaskGroupRequestId> {
+
+    List<TaskGroupRequestEntity> findByTaskGroupId(Long taskGroupId);
+
+    List<TaskGroupRequestEntity> findByRescueRequestId(Long rescueRequestId);
 }

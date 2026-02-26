@@ -30,7 +30,20 @@ public interface RescueRequestRepository extends JpaRepository<RescueRequestEnti
 
     List<RescueRequestEntity> findByMasterRequestId(Long masterRequestId);
 
-    @Query("SELECT r FROM RescueRequestEntity r WHERE r.status = :status ORDER BY r.priority DESC, r.affectedPeopleCount DESC, r.createdAt ASC")
+    @Query("""
+            SELECT r
+            FROM RescueRequestEntity r
+            WHERE r.status = :status
+            ORDER BY 
+              CASE r.priority
+                WHEN com.floodrescue.shared.enums.RescuePriority.HIGH THEN 3
+                WHEN com.floodrescue.shared.enums.RescuePriority.MEDIUM THEN 2
+                WHEN com.floodrescue.shared.enums.RescuePriority.LOW THEN 1
+                ELSE 0
+              END DESC,
+              r.affectedPeopleCount DESC,
+              r.createdAt ASC
+            """)
     Page<RescueRequestEntity> findPendingRequestsOrderedByPriority(
             @Param("status") RescueRequestStatus status,
             Pageable pageable

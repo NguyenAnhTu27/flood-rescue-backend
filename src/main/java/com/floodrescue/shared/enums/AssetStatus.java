@@ -1,4 +1,9 @@
 package com.floodrescue.shared.enums;
 
-public class AssetStatus {
+public enum AssetStatus {
+    AVAILABLE,
+    IN_USE,
+    MAINTENANCE,
+    BROKEN,
+    INACTIVE
 }

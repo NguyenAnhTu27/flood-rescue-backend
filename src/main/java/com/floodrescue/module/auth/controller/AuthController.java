@@ -1,4 +1,4 @@
-package com.floodrescue.module.auth.controller;
+    package com.floodrescue.module.auth.controller;
 
 import com.floodrescue.module.auth.dto.request.LoginRequest;
 import com.floodrescue.module.auth.dto.request.RegisterCitizenRequest;
