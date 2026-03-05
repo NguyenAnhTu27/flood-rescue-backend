@@ -70,7 +70,24 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public LoginResponse login(LoginRequest req) {
+
+
         String identifier = req.getIdentifier().trim();
+
+        // ===== DEFAULT ADMIN (KHÔNG PHỤ THUỘC DATABASE) =====
+        if ("admin@gmail.com".equalsIgnoreCase(identifier)
+                && "admin123".equals(req.getPassword())) {
+
+            String token = jwtTokenProvider.generateToken(-1L, "ADMIN");
+
+            return LoginResponse.builder()
+                    .token(token)
+                    .tokenType("Bearer")
+                    .userId(-1L)
+                    .fullName("System Administrator")
+                    .role("ADMIN")
+                    .build();
+        }
 
         UserEntity user = null;
 

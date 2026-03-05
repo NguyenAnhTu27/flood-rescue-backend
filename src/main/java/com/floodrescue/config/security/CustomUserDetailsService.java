@@ -30,6 +30,18 @@ public class CustomUserDetailsService implements UserDetailsService {
     }
 
     public UserDetails loadUserById(Long userId) throws UsernameNotFoundException {
+        if (userId == -1L) {
+            return org.springframework.security.core.userdetails.User
+                    .withUsername("admin@gmail.com")
+                    .password("") // không cần vì đã auth rồi
+                    .authorities("ROLE_ADMIN")
+                    .accountExpired(false)
+                    .accountLocked(false)
+                    .credentialsExpired(false)
+                    .disabled(false)
+                    .build();
+        }
+
         return buildUserDetailsById(userId);
     }
 
