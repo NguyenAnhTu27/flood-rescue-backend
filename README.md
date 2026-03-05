@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Rescue Management System
 
 ## Giới thiệu
@@ -76,3 +77,7 @@ Server: `http://localhost:8080`
 | dispatcher@rescue.vn | 123456 | dispatcher |
 | alpha@rescue.vn | 123456 | team_leader |
 | citizen1@gmail.com | 123456 | citizen |
+=======
+# flood-rescue-backend
+Backend system for Flood Rescue &amp; Emergency Relief Website. Handles APIs for rescue requests, emergency reports, user management, and coordination during flood disasters.
+>>>>>>> 147d035f56f7b2261425a6bb00d91fea2bb694a5
