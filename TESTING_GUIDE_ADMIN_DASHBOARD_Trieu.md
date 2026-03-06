@@ -493,27 +493,3 @@ LIMIT 100;
 | Settings | Lưu cấu hình | `PUT /api/admin/system-settings` | Upsert `system_settings`, write `audit_logs` |
 | Audit | Tìm log | `GET /api/admin/audit-logs` | Read `audit_logs` |
 
-## 11. Các lỗi thường gặp
-1. `401 Chưa đăng nhập hoặc token không hợp lệ`:
-- Thiếu `Authorization: Bearer <token>` hoặc token hết hạn/sai.
-2. `403 Access Denied`:
-- User không phải ADMIN gọi `/api/admin/**`.
-3. `503 Hệ thống đang bảo trì`:
-- `maintenanceMode=true` và user không phải ADMIN.
-4. `400 ... đã tồn tại`:
-- Vi phạm unique (`email`, `phone`, `template_key`, `group_code+code`).
-5. `400 Permission không tồn tại`:
-- Gửi permission code không có trong bảng `permissions`.
-6. `400 Không thể xoá user vì còn dữ liệu liên quan`:
-- Còn FK phụ thuộc chưa xử lý hết.
-
-## 12. Kết luận cho dev mới
-1. Admin module đã kết nối DB thật, không còn mock cho các trang chính.
-2. Tất cả thao tác quan trọng đều có audit log.
-3. System settings đã ảnh hưởng runtime thật vào auth/rescue/dashboard.
-4. Khi thêm tính năng mới, luôn cập nhật theo chuỗi:
-- UI button action.
-- API controller/service.
-- Repository + DB migration/schema.
-- Audit log.
-- Test Postman + SQL verify.
