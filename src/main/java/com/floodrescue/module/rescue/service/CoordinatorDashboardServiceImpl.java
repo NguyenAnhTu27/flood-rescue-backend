@@ -1,6 +1,6 @@
 package com.floodrescue.module.rescue.service;
 
-import com.floodrescue.module.asset.repository.AssetReponsitory;
+import com.floodrescue.module.asset.repository.AssetRepository;
 import com.floodrescue.module.rescue.dto.response.CoordinatorDashboardResponse;
 import com.floodrescue.module.rescue.repository.RescueAssignmentRepository;
 import com.floodrescue.module.rescue.repository.RescueRequestRepository;
@@ -22,7 +22,7 @@ public class CoordinatorDashboardServiceImpl implements CoordinatorDashboardServ
 
     private final RescueRequestRepository rescueRequestRepository;
     private final TeamRepository teamRepository;
-    private final AssetReponsitory assetRepository;
+    private final AssetRepository assetRepository;
     private final RescueAssignmentRepository rescueAssignmentRepository;
 
     @Override

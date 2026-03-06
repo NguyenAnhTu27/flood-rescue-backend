@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_ra_active", columnList = "is_active")
         }
 )
-public class RescueAssigmentEntity {
+public class RescueAssignmentEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

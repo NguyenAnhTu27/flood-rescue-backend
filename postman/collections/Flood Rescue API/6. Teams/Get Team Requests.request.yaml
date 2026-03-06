@@ -1,0 +1,10 @@
+$kind: http-request
+url: "{{base_url}}/api/teams/1/requests"
+method: GET
+headers:
+  Authorization: Bearer {{coordinator_token}}
+scripts:
+  - type: afterResponse
+    code: pm.test('Status is 200 or 404', () =>
+      pm.expect(pm.response.code).to.be.oneOf([200, 404]));
+order: 1000

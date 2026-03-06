@@ -54,7 +54,7 @@ public interface RescueRequestRepository extends JpaRepository<RescueRequestEnti
             SELECT rq
             FROM RescueRequestEntity rq
             JOIN TaskGroupRequestEntity tgr ON rq.id = tgr.rescueRequest.id
-            JOIN RescueAssigmentEntity ra ON tgr.taskGroup.id = ra.taskGroup.id
+            JOIN RescueAssignmentEntity ra ON tgr.taskGroup.id = ra.taskGroup.id
             WHERE ra.team.id = :teamId AND ra.isActive = true
             """)
     Page<RescueRequestEntity> findActiveRequestsByTeamId(@Param("teamId") Long teamId, Pageable pageable);

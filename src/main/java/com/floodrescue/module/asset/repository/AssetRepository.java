@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface AssetReponsitory extends JpaRepository<AssetEntity, Long> {
+public interface AssetRepository extends JpaRepository<AssetEntity, Long> {
 
     List<AssetEntity> findByStatus(AssetStatus status);
 

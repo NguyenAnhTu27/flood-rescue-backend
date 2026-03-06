@@ -1,0 +1,8 @@
+$kind: http-request
+url: "{{base_url}}/api/rescue/citizen/requests"
+method: GET
+scripts:
+  - type: afterResponse
+    code: pm.test('Unauthorized without token', () =>
+      pm.response.to.have.status(401));
+order: 4000
