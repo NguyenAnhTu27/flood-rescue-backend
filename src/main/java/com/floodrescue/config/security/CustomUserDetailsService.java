@@ -50,7 +50,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         UserEntity user = userRepo.findByIdWithRole(userId)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + userId));
 
-        String roleCode = user.getRole().getCode(); // "CITIZEN", "DISPATCHER"...
+        String roleCode = user.getRole().getCode(); // "CITIZEN", "COORDINATOR", ...
         List<GrantedAuthority> authorities =
                 List.of(new SimpleGrantedAuthority("ROLE_" + roleCode));
 

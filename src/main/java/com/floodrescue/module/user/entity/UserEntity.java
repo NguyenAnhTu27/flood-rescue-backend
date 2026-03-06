@@ -53,6 +53,15 @@ public class UserEntity {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
+    @Column(name = "failed_login_attempts")
+    private Integer failedLoginAttempts;
+
+    @Column(name = "locked_at")
+    private LocalDateTime lockedAt;
+
+    @Column(name = "temp_locked_until")
+    private LocalDateTime tempLockedUntil;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 

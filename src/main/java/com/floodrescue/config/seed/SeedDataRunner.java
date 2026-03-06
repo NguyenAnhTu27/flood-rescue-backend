@@ -46,15 +46,31 @@ public class SeedDataRunner implements ApplicationRunner {
 
         // Ensure roles exist
         ensureRole("CITIZEN", "Công dân");
-        RoleEntity coordinatorRole = ensureRole("COORDINATOR", "Điều phối");
+        RoleEntity coordinatorRole = ensureRole("COORDINATOR", "Điều phối cứu hộ");
         ensureRole("RESCUER", "Đội cứu hộ");
         ensureRole("MANAGER", "Quản lý");
-        ensureRole("ADMIN", "Admin");
+        ensureRole("ADMIN", "Quản trị hệ thống");
 
         // Create default coordinator user if not exists by email/phone
-        boolean exists = (coordinatorEmail != null && !coordinatorEmail.isBlank() && userRepository.existsByEmail(coordinatorEmail.trim().toLowerCase()))
-                || (coordinatorPhone != null && !coordinatorPhone.isBlank() && userRepository.existsByPhone(coordinatorPhone.trim()));
-        if (exists) return;
+        String normalizedEmail = coordinatorEmail == null ? null : coordinatorEmail.trim().toLowerCase();
+        String normalizedPhone = coordinatorPhone == null ? null : coordinatorPhone.trim();
+
+        UserEntity existing = null;
+        if (normalizedEmail != null && !normalizedEmail.isBlank()) {
+            existing = userRepository.findByEmail(normalizedEmail).orElse(null);
+        }
+        if (existing == null && normalizedPhone != null && !normalizedPhone.isBlank()) {
+            existing = userRepository.findByPhone(normalizedPhone).orElse(null);
+        }
+        if (existing != null) {
+            if (coordinatorFullName != null && !coordinatorFullName.isBlank()
+                    && !coordinatorFullName.equals(existing.getFullName())) {
+                existing.setFullName(coordinatorFullName);
+                existing.setUpdatedAt(LocalDateTime.now());
+                userRepository.save(existing);
+            }
+            return;
+        }
 
         LocalDateTime now = LocalDateTime.now();
 
@@ -62,8 +78,8 @@ public class SeedDataRunner implements ApplicationRunner {
                 .role(coordinatorRole)
                 .teamId(null)
                 .fullName(coordinatorFullName)
-                .phone(coordinatorPhone)
-                .email(coordinatorEmail == null ? null : coordinatorEmail.trim().toLowerCase())
+                .phone(normalizedPhone)
+                .email(normalizedEmail)
                 .passwordHash(passwordEncoder.encode(coordinatorPassword))
                 .status((byte) 1)
                 .createdAt(now)
@@ -85,4 +101,3 @@ public class SeedDataRunner implements ApplicationRunner {
                 });
     }
 }
-

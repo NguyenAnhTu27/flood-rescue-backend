@@ -11,20 +11,37 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "teams")
+@Table(name = "teams",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_teams_code", columnNames = "code")
+        },
+        indexes = {
+                @Index(name = "idx_teams_type_status", columnList = "team_type,status")
+        }
+)
 public class TeamEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false, length = 30)
+    private String code;
+
     @Column(nullable = false, length = 120)
     private String name;
+
+    @Column(name = "team_type", nullable = false, length = 20)
+    private String teamType;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private Byte status = 1;
 
     @Column(length = 255)
     private String description;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at", nullable = false)
@@ -32,8 +49,9 @@ public class TeamEntity {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
+        createdAt = now;
+        updatedAt = now;
     }
 
     @PreUpdate

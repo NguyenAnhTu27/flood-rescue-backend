@@ -1,5 +1,6 @@
 package com.floodrescue.module.rescue.service;
 
+import com.floodrescue.module.admin.service.SystemSettingService;
 import com.floodrescue.module.rescue.dto.request.*;
 import com.floodrescue.module.rescue.dto.response.RescueRequestResponse;
 import com.floodrescue.module.rescue.entity.RescueRequestAttachmentEntity;
@@ -23,6 +24,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -35,12 +37,28 @@ public class RescueRequestServiceImpl implements RescueRequestService {
     private final RescueTimelineRepository timelineRepository;
     private final UserRepository userRepository;
     private final RescueRequestMapper mapper;
+    private final SystemSettingService systemSettingService;
+
+    private static final List<RescueRequestStatus> OPEN_REQUEST_STATUSES = List.of(
+            RescueRequestStatus.PENDING,
+            RescueRequestStatus.VERIFIED,
+            RescueRequestStatus.IN_PROGRESS
+    );
 
     @Override
     @Transactional
     public RescueRequestResponse createRescueRequest(Long citizenId, RescueRequestCreateRequest request) {
         UserEntity citizen = userRepository.findById(citizenId)
                 .orElseThrow(() -> new NotFoundException("Người dùng không tồn tại"));
+
+        int maxOpenRequests = systemSettingService.getMaxOpenRequestPerCitizen();
+        long openRequests = rescueRequestRepository.countByCitizenIdAndStatusIn(citizenId, OPEN_REQUEST_STATUSES);
+        if (openRequests >= maxOpenRequests) {
+            throw new BusinessException("Bạn đang có " + openRequests + " yêu cầu đang mở. Tối đa cho phép là " + maxOpenRequests);
+        }
+
+        int slaMinutes = systemSettingService.getRescueSlaMinutes();
+        LocalDateTime now = LocalDateTime.now();
 
         // Generate unique code
         String code;
@@ -62,6 +80,8 @@ public class RescueRequestServiceImpl implements RescueRequestService {
                 .description(request.getDescription())
                 .addressText(request.getAddressText())
                 .locationVerified(false)
+                .slaMinutes(slaMinutes)
+                .slaDueAt(now.plusMinutes(slaMinutes))
                 .build();
 
         final RescueRequestEntity savedEntity = rescueRequestRepository.save(entity);

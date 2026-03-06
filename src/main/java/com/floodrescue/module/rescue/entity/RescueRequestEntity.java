@@ -68,6 +68,12 @@ public class RescueRequestEntity {
     @Builder.Default
     private Boolean locationVerified = false;
 
+    @Column(name = "sla_minutes")
+    private Integer slaMinutes;
+
+    @Column(name = "sla_due_at")
+    private LocalDateTime slaDueAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

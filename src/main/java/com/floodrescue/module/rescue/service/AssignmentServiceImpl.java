@@ -1,7 +1,7 @@
 package com.floodrescue.module.rescue.service;
 
 import com.floodrescue.module.asset.entity.AssetEntity;
-import com.floodrescue.module.asset.repository.AssetReponsitory;
+import com.floodrescue.module.asset.repository.AssetRepository;
 import com.floodrescue.module.rescue.dto.request.AssignTaskGroupRequest;
 import com.floodrescue.module.rescue.dto.response.AssignmentResponse;
 import com.floodrescue.module.rescue.dto.response.TaskGroupResponse;
@@ -37,7 +37,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final TaskGroupTimelineRepository taskGroupTimelineRepository;
     private final RescueAssignmentRepository rescueAssignmentRepository;
     private final TeamRepository teamRepository;
-    private final AssetReponsitory assetRepository;
+    private final AssetRepository assetRepository;
     private final UserRepository userRepository;
     private final TaskGroupMapper mapper;
 

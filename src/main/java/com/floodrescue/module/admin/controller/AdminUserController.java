@@ -1,21 +1,18 @@
 package com.floodrescue.module.admin.controller;
 
-
-import com.floodrescue.module.user.dto.response.request.CreateUserByAdminRequest;
-import com.floodrescue.module.user.entity.RoleEntity;
-import com.floodrescue.module.user.entity.UserEntity;
-import com.floodrescue.module.user.repository.RoleRepository;
-import com.floodrescue.module.user.repository.UserRepository;
+import com.floodrescue.module.user.dto.response.request.CreateUserAdminRequest;
+import com.floodrescue.module.admin.dto.UpdateStatusRequest;
+import com.floodrescue.module.admin.dto.UpdateUserInfoRequest;
+import com.floodrescue.module.admin.service.AdminUserService;
+import jakarta.validation.Valid;
 
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-        import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -23,117 +20,93 @@ import java.util.stream.Collectors;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminUserController {
 
-    private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final AdminUserService adminUserService;
 
     // ===============================
-    // 1️⃣ TẠO USER
+    // 1️⃣ CREATE USER
     // ===============================
     @PostMapping("/create-user")
-    public ResponseEntity<?> createUser(@RequestBody CreateUserByAdminRequest request) {
+    public ResponseEntity<?> createUser(
+            @Valid @RequestBody CreateUserAdminRequest request){
 
-        if (userRepository.existsByEmail(request.getEmail())) {
-            return ResponseEntity.badRequest().body("Email đã tồn tại");
-        }
-
-        if (request.getPhone() != null && userRepository.existsByPhone(request.getPhone())) {
-            return ResponseEntity.badRequest().body("Số điện thoại đã tồn tại");
-        }
-        RoleEntity role = roleRepository.findById(request.getRoleId()).orElse(null);
-
-        if (role == null) {
-            return ResponseEntity.badRequest().body("RoleId không tồn tại");
-        }
-        if ("ADMIN".equals(role.getCode())) {
-            return ResponseEntity.badRequest().body("Không được tạo ADMIN mới");
-        }
-
-        UserEntity user = UserEntity.builder()
-                .fullName(request.getFullName())
-                .email(request.getEmail())
-                .phone(request.getPhone())
-                .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .role(role)
-                .teamId(request.getTeamId())
-                .status((byte) 1)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
-
-        userRepository.save(user);
-
-        return ResponseEntity.ok("Tạo tài khoản thành công");
+        return ResponseEntity.ok(
+                adminUserService.createUser(request)
+        );
     }
 
     // ===============================
-    // 2️⃣ XEM USER CHIA THEO ROLE
+    // 2️⃣ SEARCH USER
     // ===============================
-    @GetMapping("/users-by-role")
-    public ResponseEntity<?> getUsersByRole() {
+    @GetMapping("/users")
+    public ResponseEntity<?> searchUsers(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long roleId,
+            @RequestParam(defaultValue = "0") int page){
 
-        var roles = roleRepository.findAll();
-
-        var result = roles.stream()
-                .collect(Collectors.toMap(
-                        RoleEntity::getCode,
-                        role -> userRepository.findByRole(role)
-                ));
-
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(
+                adminUserService.searchUsers(keyword, roleId, page)
+        );
     }
 
     // ===============================
-// 3️⃣ XOÁ USER
-// ===============================
-    @DeleteMapping("/delete-user/{id}")
-    public ResponseEntity<?> deleteUser(@PathVariable Long id) {
+    // 3️⃣ DELETE USER
+    // ===============================
+    @DeleteMapping("/users/{id}")
+    public ResponseEntity<?> deleteUser(@PathVariable Long id){
 
-        var userOptional = userRepository.findById(id);
-
-        if (userOptional.isEmpty()) {
-            return ResponseEntity.badRequest().body("User không tồn tại");
-        }
-
-        UserEntity user = userOptional.get();
-
-        if (user.getRole() != null && "ADMIN".equals(user.getRole().getCode())) {
-            return ResponseEntity.badRequest().body("Không được xoá ADMIN");
-        }
-
-        userRepository.deleteById(id);
-
-        return ResponseEntity.ok("Đã xoá user thành công");
+        return ResponseEntity.ok(
+                adminUserService.deleteUser(id)
+        );
     }
 
     // ===============================
-// 4️⃣ RESET PASSWORD
-// ===============================
-    @PutMapping("/reset-password/{id}")
+    // 4️⃣ RESET PASSWORD
+    // ===============================
+    @PutMapping("/users/{id}/reset-password")
     public ResponseEntity<?> resetPassword(
             @PathVariable Long id,
-            @RequestBody Map<String, String> body
-    ) {
+            @RequestBody Map<String,String> body){
 
-        var userOptional = userRepository.findById(id);
+        String password = body.get("password");
 
-        if (userOptional.isEmpty()) {
-            return ResponseEntity.badRequest().body("User không tồn tại");
-        }
+        return ResponseEntity.ok(
+                adminUserService.resetPassword(id, password)
+        );
+    }
 
-        UserEntity user = userOptional.get();
+    // ===============================
+    // 5️⃣ UPDATE STATUS
+    // ===============================
+    @PutMapping("/users/{id}/status")
+    public ResponseEntity<?> updateStatus(
+            @PathVariable Long id,
+            @RequestBody UpdateStatusRequest request){
 
-        if ("ADMIN".equals(user.getRole().getCode())) {
-            return ResponseEntity.badRequest().body("Không được reset ADMIN");
-        }
+        return ResponseEntity.ok(
+                adminUserService.updateStatus(id, request)
+        );
+    }
 
-        String newPassword = body.get("password");
+    @PutMapping("/users/{id}")
+    public ResponseEntity<?> updateUser(
+            @PathVariable Long id,
+            @RequestBody UpdateUserInfoRequest request) {
+        return ResponseEntity.ok(adminUserService.updateUser(id, request));
+    }
 
-        user.setPasswordHash(passwordEncoder.encode(newPassword));
-        user.setUpdatedAt(LocalDateTime.now());
+    // ===============================
+    // 6️⃣ SYSTEM STATS
+    // ===============================
+    @GetMapping("/stats")
+    public ResponseEntity<?> stats(){
 
-        userRepository.save(user);
+        return ResponseEntity.ok(
+                adminUserService.getStats()
+        );
+    }
 
-        return ResponseEntity.ok("Reset password thành công");
+    @GetMapping("/teams")
+    public ResponseEntity<?> teams() {
+        return ResponseEntity.ok(adminUserService.getTeams());
     }
 }

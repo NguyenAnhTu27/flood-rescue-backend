@@ -1,4 +1,7 @@
 package com.floodrescue.module.inventory.repository;
 
-public class IssueRepository {
+import com.floodrescue.module.inventory.entity.InventoryIssueEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface IssueRepository extends JpaRepository<InventoryIssueEntity, Long> {
 }

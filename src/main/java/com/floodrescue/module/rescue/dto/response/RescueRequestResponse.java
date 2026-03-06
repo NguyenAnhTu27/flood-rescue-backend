@@ -31,6 +31,8 @@ public class RescueRequestResponse {
     private String description;
     private String addressText;
     private Boolean locationVerified;
+    private Integer slaMinutes;
+    private LocalDateTime slaDueAt;
 
     private List<AttachmentResponse> attachments;
     private List<TimelineResponse> timeline;

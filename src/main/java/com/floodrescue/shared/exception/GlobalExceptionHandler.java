@@ -33,4 +33,11 @@ public class GlobalExceptionHandler {
                 "errors", errors
         ));
     }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<?> handleRuntime(RuntimeException ex) {
+        return ResponseEntity.badRequest().body(Map.of(
+                "message", ex.getMessage() == null ? "Lỗi xử lý yêu cầu" : ex.getMessage()
+        ));
+    }
 }

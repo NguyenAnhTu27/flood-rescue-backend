@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Collection;
 
 public interface RescueRequestRepository extends JpaRepository<RescueRequestEntity, Long> {
 
@@ -29,6 +30,8 @@ public interface RescueRequestRepository extends JpaRepository<RescueRequestEnti
     );
 
     List<RescueRequestEntity> findByMasterRequestId(Long masterRequestId);
+
+    long countByCitizenIdAndStatusIn(Long citizenId, Collection<RescueRequestStatus> statuses);
 
     @Query("""
             SELECT r

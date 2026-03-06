@@ -1,4 +1,7 @@
 package com.floodrescue.module.inventory.repository;
 
-public class ReceiptLineRepository {
+import com.floodrescue.module.inventory.entity.InventoryReceiptLineEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface ReceiptLineRepository extends JpaRepository<InventoryReceiptLineEntity, Long> {
 }

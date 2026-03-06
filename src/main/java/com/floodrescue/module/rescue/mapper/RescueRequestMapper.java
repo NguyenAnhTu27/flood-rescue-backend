@@ -29,6 +29,8 @@ public class RescueRequestMapper {
                 .description(entity.getDescription())
                 .addressText(entity.getAddressText())
                 .locationVerified(entity.getLocationVerified())
+                .slaMinutes(entity.getSlaMinutes())
+                .slaDueAt(entity.getSlaDueAt())
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt());
 

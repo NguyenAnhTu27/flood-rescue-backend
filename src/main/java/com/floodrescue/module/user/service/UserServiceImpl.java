@@ -1,6 +1,6 @@
 package com.floodrescue.module.user.service;
 
-import com.floodrescue.module.user.dto.response.request.CreateUserByAdminRequest;
+import com.floodrescue.module.user.dto.response.request.CreateUserAdminRequest;
 import com.floodrescue.module.user.entity.RoleEntity;
 import com.floodrescue.module.user.entity.UserEntity;
 import com.floodrescue.module.user.repository.RoleRepository;
@@ -22,7 +22,7 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
 
     @Override
-    public UserEntity createUser(CreateUserByAdminRequest request) {
+    public UserEntity createUser(CreateUserAdminRequest request) {
 
         if (request.getEmail() == null && request.getPhone() == null) {
             throw new RuntimeException("Email hoặc phone phải có");
@@ -41,7 +41,6 @@ public class UserServiceImpl implements UserService {
 
         UserEntity user = UserEntity.builder()
                 .role(role)
-                .teamId(request.getTeamId())
                 .fullName(request.getFullName())
                 .phone(request.getPhone())
                 .email(request.getEmail())
