@@ -38,11 +38,4 @@ public class InventoryReceiptLineEntity {
 
     @Column(name = "unit", nullable = false, length = 20)
     private String unit;
-
-    /**
-     * Tên mặt hàng tại thời điểm tạo phiếu (snapshot).
-     * Nếu null, sẽ lấy từ ItemCategory khi hiển thị.
-     */
-    @Column(name = "item_name", length = 120)
-    private String itemName;
 }

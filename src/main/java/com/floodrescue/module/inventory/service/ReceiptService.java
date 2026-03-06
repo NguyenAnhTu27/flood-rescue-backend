@@ -54,18 +54,11 @@ public class ReceiptService {
                     ItemCategoryEntity category = itemCategoryRepository.findById(lineReq.getItemCategoryId())
                             .orElseThrow(() -> new NotFoundException("Loại hàng không tồn tại: " + lineReq.getItemCategoryId()));
                     
-                    // Lấy itemName từ request, nếu không có thì lấy từ category
-                    String itemName = lineReq.getItemName();
-                    if (itemName == null || itemName.trim().isEmpty()) {
-                        itemName = category.getName();
-                    }
-                    
                     return InventoryReceiptLineEntity.builder()
                             .receipt(saved)
                             .itemCategory(category)
                             .qty(BigDecimal.valueOf(lineReq.getQty()))
                             .unit(lineReq.getUnit())
-                            .itemName(itemName)
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -147,8 +140,7 @@ public class ReceiptService {
                         .id(l.getId())
                         .itemCategoryId(l.getItemCategory().getId())
                         .itemCode(l.getItemCategory().getCode())
-                        // Ưu tiên lấy itemName từ entity (snapshot), nếu null thì lấy từ category
-                        .itemName(l.getItemName() != null ? l.getItemName() : l.getItemCategory().getName())
+                        .itemName(l.getItemCategory().getName())
                         .qty(l.getQty())
                         .unit(l.getUnit())
                         .build()).collect(Collectors.toList()))

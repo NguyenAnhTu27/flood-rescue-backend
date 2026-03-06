@@ -18,11 +18,5 @@ public class InventoryReceiptLineRequest {
 
     @NotNull(message = "Đơn vị tính không được để trống")
     private String unit;
-
-    /**
-     * Tên mặt hàng cụ thể (optional - để FE hiển thị/validate).
-     * Nếu không có, BE sẽ lấy từ ItemCategory theo itemCategoryId.
-     */
-    private String itemName;
 }
 

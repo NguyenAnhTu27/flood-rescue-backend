@@ -1,5 +1,7 @@
 package com.floodrescue.module.inventory.service;
 
+import com.floodrescue.module.asset.entity.AssetEntity;
+import com.floodrescue.module.asset.repository.AssetReponsitory;
 import com.floodrescue.module.inventory.dto.request.InventoryIssueCreateRequest;
 import com.floodrescue.module.inventory.dto.response.InventoryIssueResponse;
 import com.floodrescue.module.inventory.entity.InventoryIssueEntity;
@@ -8,6 +10,10 @@ import com.floodrescue.module.inventory.entity.ItemCategoryEntity;
 import com.floodrescue.module.inventory.repository.IssueLineRepository;
 import com.floodrescue.module.inventory.repository.IssueRepository;
 import com.floodrescue.module.inventory.repository.ItemCategoryRepository;
+import com.floodrescue.module.relief.entity.ReliefRequestEntity;
+import com.floodrescue.module.relief.reponsitory.ReliefRequestRepository;
+import com.floodrescue.module.team.entity.TeamEntity;
+import com.floodrescue.module.team.repository.TeamRepository;
 import com.floodrescue.shared.enums.InventoryDocumentStatus;
 import com.floodrescue.shared.exception.BusinessException;
 import com.floodrescue.shared.exception.NotFoundException;
@@ -30,6 +36,9 @@ public class IssueService {
     private final IssueLineRepository issueLineRepository;
     private final ItemCategoryRepository itemCategoryRepository;
     private final StockService stockService;
+    private final ReliefRequestRepository reliefRequestRepository;
+    private final TeamRepository teamRepository;
+    private final AssetReponsitory assetRepository;
 
     @Transactional
     public InventoryIssueResponse createIssue(Long userId, InventoryIssueCreateRequest request) {
@@ -39,10 +48,32 @@ public class IssueService {
 
         String code = CodeGenerator.generateInventoryIssueCode();
 
+        // Load các entity liên quan
+        ReliefRequestEntity reliefRequest = null;
+        if (request.getReliefRequestId() != null) {
+            reliefRequest = reliefRequestRepository.findById(request.getReliefRequestId())
+                    .orElseThrow(() -> new NotFoundException("Phiếu yêu cầu cứu trợ không tồn tại: " + request.getReliefRequestId()));
+        }
+
+        TeamEntity assignedTeam = null;
+        if (request.getAssignedTeamId() != null) {
+            assignedTeam = teamRepository.findById(request.getAssignedTeamId())
+                    .orElseThrow(() -> new NotFoundException("Đội cứu hộ không tồn tại: " + request.getAssignedTeamId()));
+        }
+
+        AssetEntity asset = null;
+        if (request.getAssetId() != null) {
+            asset = assetRepository.findById(request.getAssetId())
+                    .orElseThrow(() -> new NotFoundException("Phương tiện không tồn tại: " + request.getAssetId()));
+        }
+
         final InventoryIssueEntity issue = InventoryIssueEntity.builder()
                 .code(code)
                 .status(InventoryDocumentStatus.DRAFT)
                 .createdById(userId)
+                .reliefRequest(reliefRequest)
+                .assignedTeam(assignedTeam)
+                .asset(asset)
                 .note(request.getNote())
                 .build();
 
@@ -124,7 +155,7 @@ public class IssueService {
     }
 
     private InventoryIssueResponse toResponse(InventoryIssueEntity issue, List<InventoryIssueLineEntity> lines) {
-        return InventoryIssueResponse.builder()
+        InventoryIssueResponse.InventoryIssueResponseBuilder builder = InventoryIssueResponse.builder()
                 .id(issue.getId())
                 .code(issue.getCode())
                 .status(issue.getStatus())
@@ -139,7 +170,26 @@ public class IssueService {
                         .itemName(l.getItemCategory().getName())
                         .qty(l.getQty())
                         .unit(l.getUnit())
-                        .build()).collect(Collectors.toList()))
-                .build();
+                        .build()).collect(Collectors.toList()));
+
+        // Map các field liên quan
+        if (issue.getReliefRequest() != null) {
+            builder.reliefRequestId(issue.getReliefRequest().getId())
+                    .reliefRequestCode(issue.getReliefRequest().getCode());
+        }
+
+        if (issue.getAssignedTeam() != null) {
+            builder.assignedTeamId(issue.getAssignedTeam().getId())
+                    .assignedTeamName(issue.getAssignedTeam().getName())
+                    .assignedTeamCode(issue.getAssignedTeam().getCode());
+        }
+
+        if (issue.getAsset() != null) {
+            builder.assetId(issue.getAsset().getId())
+                    .assetCode(issue.getAsset().getCode())
+                    .assetName(issue.getAsset().getName());
+        }
+
+        return builder.build();
     }
 }
