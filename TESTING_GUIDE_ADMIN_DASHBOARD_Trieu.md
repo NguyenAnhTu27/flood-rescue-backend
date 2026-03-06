@@ -220,6 +220,23 @@ Key cấu hình đang dùng:
 5. `maintenanceMode`.
 6. `mapRefreshSeconds`.
 7. `hotline`.
+8. `footerBrandName`.
+9. `footerDescription`.
+10. `footerTermsLabel`.
+11. `footerTermsUrl`.
+12. `footerPrivacyLabel`.
+13. `footerPrivacyUrl`.
+14. `footerSupportLabel`.
+15. `footerSupportUrl`.
+16. `footerSupportEmail`.
+17. `footerFacebookUrl`.
+18. `footerTwitterUrl`.
+19. `footerYoutubeUrl`.
+20. `footerCopyright`.
+
+Lưu ý quan trọng:
+1. Hệ thống chỉ dùng **1 số điện thoại duy nhất** là `hotline`.
+2. Không dùng key phone riêng cho footer để tránh lệch dữ liệu.
 
 API gọi và ghi DB:
 1. `GET /api/admin/system-settings`
@@ -238,12 +255,16 @@ Tác dụng runtime thật:
 4. `rescueSlaMinutes`
 - Gán `sla_minutes` + `sla_due_at` khi tạo `rescue_requests` mới.
 5. `hotline`
-- Frontend citizen dashboard lấy từ API public để hiển thị nút gọi.
+- Frontend citizen dashboard và footer toàn hệ thống lấy từ API public để hiển thị số hỗ trợ.
 6. `mapRefreshSeconds`
 - Frontend coordinator dashboard dùng làm chu kỳ tự refresh dashboard.
+7. Nhóm `footer*`
+- Footer ở các trang lấy từ `/api/public/runtime-settings`, nên khi admin lưu cấu hình thì giao diện cuối trang đổi theo DB thật, không hardcode frontend.
 
 API public runtime để frontend dùng:
 1. `GET /api/public/runtime-settings`.
+- Trả về cả tham số vận hành (`maintenanceMode`, `mapRefreshSeconds`, `hotline`, ...)
+- Và toàn bộ cấu hình footer (`footerBrandName`, `footerDescription`, link/email/social/copyright).
 
 ## 5.7 Nhật ký hệ thống `/admin/nhat-ky-he-thong`
 Mục đích:
@@ -411,6 +432,28 @@ ORDER BY id DESC;
 ```sql
 SELECT id, setting_key, setting_value, key_name, value_text, value_type, updated_by, description, updated_at
 FROM system_settings
+ORDER BY setting_key;
+```
+
+```sql
+SELECT setting_key, setting_value, updated_at
+FROM system_settings
+WHERE setting_key IN (
+  'hotline',
+  'footerBrandName',
+  'footerDescription',
+  'footerTermsLabel',
+  'footerTermsUrl',
+  'footerPrivacyLabel',
+  'footerPrivacyUrl',
+  'footerSupportLabel',
+  'footerSupportUrl',
+  'footerSupportEmail',
+  'footerFacebookUrl',
+  'footerTwitterUrl',
+  'footerYoutubeUrl',
+  'footerCopyright'
+)
 ORDER BY setting_key;
 ```
 
