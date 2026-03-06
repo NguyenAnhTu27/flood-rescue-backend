@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{base_url}}/api/map/teams/nearest?lat=16.05&lng=108.20&radius=10"
+method: GET
+headers:
+  Authorization: Bearer {{token}}
+queryParams:
+  lat: "16.05"
+  lng: "108.20"
+  radius: "10"
+scripts:
+  - type: afterResponse
+    code: pm.test('Status is 200', () => pm.response.to.have.status(200));
+order: 2000

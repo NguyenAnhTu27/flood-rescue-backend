@@ -1,16 +1,17 @@
 package com.floodrescue.config.security;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.JwtException;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -25,15 +26,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String auth = request.getHeader("Authorization");
     
         if (auth != null && auth.startsWith("Bearer ") && SecurityContextHolder.getContext().getAuthentication() == null) {
-            String token = auth.substring(7).trim();
-            
-            // Validate token format: JWT must have exactly 2 periods (header.payload.signature)
-            if (token.isEmpty() || token.split("\\.").length != 3) {
-                // Invalid token format, skip authentication
-                SecurityContextHolder.clearContext();
-                chain.doFilter(request, response);
-                return;
-            }
+            String token = auth.substring(7);
     
             try {
                 Claims claims = jwtTokenProvider.parseToken(token).getBody();
@@ -48,13 +41,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 );
     
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-            } catch (JwtException | IllegalArgumentException ex) {
-                // Invalid or expired token - clear context and continue
-                // Don't log stack trace for invalid tokens (common case)
-                SecurityContextHolder.clearContext();
             } catch (Exception ex) {
-                // Other unexpected errors - log but don't break the request
-                System.err.println("[JwtAuthenticationFilter] Unexpected error: " + ex.getMessage());
+                log.warn("JWT authentication failed: {}", ex.getMessage());
                 SecurityContextHolder.clearContext();
             }
         }

@@ -50,6 +50,10 @@ public class UserEntity {
     @Column(nullable = false)
     private Byte status; // 1 active, 0 inactive
 
+    @Column(name = "is_leader", nullable = false)
+    @Builder.Default
+    private Boolean isLeader = false; // true = leader của rescue team
+
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 

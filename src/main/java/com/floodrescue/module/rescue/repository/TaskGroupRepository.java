@@ -13,8 +13,4 @@ public interface TaskGroupRepository extends JpaRepository<TaskGroupEntity, Long
     Optional<TaskGroupEntity> findByCode(String code);
 
     Page<TaskGroupEntity> findByStatus(TaskGroupStatus status, Pageable pageable);
-
-    Page<TaskGroupEntity> findByAssignedTeamId(Long teamId, Pageable pageable);
-
-    Page<TaskGroupEntity> findByAssignedTeamIdAndStatus(Long teamId, TaskGroupStatus status, Pageable pageable);
 }
