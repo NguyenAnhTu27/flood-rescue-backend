@@ -1,7 +1,0 @@
-$kind: collection
-description: Complete API test collection for Flood Rescue Backend
-variables:
-  base_url: http://localhost:8080
-  token: ""
-  coordinator_token: ""
-  request_id: ""

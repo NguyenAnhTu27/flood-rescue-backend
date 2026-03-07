@@ -26,15 +26,12 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/rescue/citizen")
 @RequiredArgsConstructor
 public class CitizenRescueController {
-
-    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(".jpg", ".jpeg", ".png", ".gif", ".webp");
 
     private final RescueRequestService rescueRequestService;
 
@@ -127,11 +124,7 @@ public class CitizenRescueController {
             String originalName = file.getOriginalFilename();
             String ext = "";
             if (originalName != null && originalName.contains(".")) {
-                ext = originalName.substring(originalName.lastIndexOf(".")).toLowerCase();
-            }
-
-            if (!ALLOWED_EXTENSIONS.contains(ext)) {
-                return ResponseEntity.badRequest().build();
+                ext = originalName.substring(originalName.lastIndexOf("."));
             }
 
             String newFileName = UUID.randomUUID() + ext;

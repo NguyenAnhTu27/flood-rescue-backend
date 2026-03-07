@@ -13,12 +13,15 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "teams", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_teams_code", columnNames = "code")
-}, indexes = {
-        @Index(name = "idx_teams_status", columnList = "status"),
-        @Index(name = "idx_teams_type", columnList = "team_type")
-})
+@Table(name = "teams",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_teams_code", columnNames = "code")
+        },
+        indexes = {
+                @Index(name = "idx_teams_status", columnList = "status"),
+                @Index(name = "idx_teams_type", columnList = "team_type")
+        }
+)
 public class TeamEntity {
 
     @Id
@@ -39,15 +42,6 @@ public class TeamEntity {
     @Column(nullable = false, length = 20)
     @Builder.Default
     private TeamStatus status = TeamStatus.ACTIVE;
-
-    @Column(name = "latitude")
-    private Double latitude;
-
-    @Column(name = "longitude")
-    private Double longitude;
-
-    @Column(name = "last_location_update")
-    private LocalDateTime lastLocationUpdate;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
