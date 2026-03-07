@@ -144,4 +144,3 @@ public class RescuerTaskServiceImpl implements RescuerTaskService {
         }
     }
 }
-
