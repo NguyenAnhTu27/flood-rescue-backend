@@ -11,19 +11,14 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "teams",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uk_teams_code", columnNames = "code")
-        })
+@Table(name = "teams")
 public class TeamEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 30, unique = true)
-    private String code;
-    @Column(nullable = false, length = 120, unique = true)
+    @Column(nullable = false, length = 120)
     private String name;
 
     @Column(length = 255)

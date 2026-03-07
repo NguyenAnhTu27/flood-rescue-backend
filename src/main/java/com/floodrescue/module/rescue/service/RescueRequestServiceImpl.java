@@ -20,7 +20,6 @@ import com.floodrescue.shared.util.CodeGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -105,8 +104,7 @@ public class RescueRequestServiceImpl implements RescueRequestService {
                 .orElseThrow(() -> new NotFoundException("Yêu cầu cứu hộ không tồn tại"));
 
         List<RescueRequestAttachmentEntity> attachments = attachmentRepository.findByRescueRequestId(entity.getId());
-        List<RescueRequestTimelineEntity> timeline = timelineRepository
-                .findByRescueRequestIdOrderByCreatedAtDesc(entity.getId());
+        List<RescueRequestTimelineEntity> timeline = timelineRepository.findByRescueRequestIdOrderByCreatedAtDesc(entity.getId());
 
         return mapper.toResponseWithDetails(entity, attachments, timeline);
     }
@@ -130,29 +128,6 @@ public class RescueRequestServiceImpl implements RescueRequestService {
     public Page<RescueRequestResponse> getPendingRescueRequests(Pageable pageable) {
         Page<RescueRequestEntity> entities = rescueRequestRepository.findPendingRequestsOrderedByPriority(
                 RescueRequestStatus.PENDING, pageable);
-        return entities.map(mapper::toResponse);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<RescueRequestResponse> searchRescueRequests(RescueRequestStatus status, RescuePriority priority,
-            String keyword, Pageable pageable) {
-        Specification<RescueRequestEntity> spec = (root, query, cb) -> cb.conjunction();
-
-        if (status != null) {
-            spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), status));
-        }
-        if (priority != null) {
-            spec = spec.and((root, query, cb) -> cb.equal(root.get("priority"), priority));
-        }
-        if (keyword != null && !keyword.trim().isEmpty()) {
-            String likePattern = "%" + keyword.trim().toLowerCase() + "%";
-            spec = spec.and((root, query, cb) -> cb.or(
-                    cb.like(cb.lower(root.get("code")), likePattern),
-                    cb.like(cb.lower(root.get("addressText")), likePattern)));
-        }
-
-        Page<RescueRequestEntity> entities = rescueRequestRepository.findAll(spec, pageable);
         return entities.map(mapper::toResponse);
     }
 
