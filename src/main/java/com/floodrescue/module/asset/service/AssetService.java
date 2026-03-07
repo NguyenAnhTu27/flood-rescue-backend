@@ -12,4 +12,3 @@ public interface AssetService {
 
     List<AssetResponse> getAssets(AssetStatus status);
 }
-

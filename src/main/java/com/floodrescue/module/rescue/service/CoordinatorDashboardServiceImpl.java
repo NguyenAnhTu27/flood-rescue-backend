@@ -57,7 +57,7 @@ public class CoordinatorDashboardServiceImpl implements CoordinatorDashboardServ
                 .map(t -> CoordinatorDashboardResponse.TeamItem.builder()
                         .id(t.getId())
                         .name(t.getName())
-                        .area(t.getTeamType() != null ? t.getTeamType().name() : null)
+                        .area(t.getDescription()) // tạm dùng description làm area
                         .status(busyTeamIds.contains(t.getId()) ? "BUSY" : "AVAILABLE")
                         .distance(null)
                         .lastUpdate(null)
@@ -111,4 +111,3 @@ public class CoordinatorDashboardServiceImpl implements CoordinatorDashboardServ
         };
     }
 }
-

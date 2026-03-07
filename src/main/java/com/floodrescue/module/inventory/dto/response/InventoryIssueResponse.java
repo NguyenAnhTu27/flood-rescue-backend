@@ -18,6 +18,21 @@ public class InventoryIssueResponse {
     private String code;
     private InventoryDocumentStatus status;
     private Long createdById;
+    
+    // Liên kết với phiếu yêu cầu cứu trợ
+    private Long reliefRequestId;
+    private String reliefRequestCode;
+    
+    // Đội vận chuyển / thực hiện xuất & giao
+    private Long assignedTeamId;
+    private String assignedTeamName;
+    private String assignedTeamCode;
+    
+    // Phương tiện
+    private Long assetId;
+    private String assetCode;
+    private String assetName;
+    
     private String note;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -36,4 +51,3 @@ public class InventoryIssueResponse {
         private String unit;
     }
 }
-

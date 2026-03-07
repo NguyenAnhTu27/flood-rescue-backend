@@ -19,9 +19,7 @@ import com.floodrescue.module.team.repository.TeamRepository;
 import com.floodrescue.module.user.entity.UserEntity;
 import com.floodrescue.module.user.repository.UserRepository;
 import com.floodrescue.shared.enums.AssetStatus;
-import com.floodrescue.shared.enums.RescueRequestStatus;
 import com.floodrescue.shared.enums.TaskGroupStatus;
-import com.floodrescue.shared.enums.TeamStatus;
 import com.floodrescue.shared.exception.BusinessException;
 import com.floodrescue.shared.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +36,6 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final TaskGroupRequestRepository taskGroupRequestRepository;
     private final TaskGroupTimelineRepository taskGroupTimelineRepository;
     private final RescueAssignmentRepository rescueAssignmentRepository;
-    private final com.floodrescue.module.rescue.repository.RescueRequestRepository rescueRequestRepository;
     private final TeamRepository teamRepository;
     private final AssetReponsitory assetRepository;
     private final UserRepository userRepository;
@@ -52,10 +49,6 @@ public class AssignmentServiceImpl implements AssignmentService {
 
         TeamEntity team = teamRepository.findById(request.getTeamId())
                 .orElseThrow(() -> new NotFoundException("Đội cứu hộ không tồn tại"));
-
-        if (team.getStatus() != TeamStatus.ACTIVE) {
-            throw new BusinessException("Đội cứu hộ không ở trạng thái sẵn sàng");
-        }
 
         AssetEntity asset = null;
         if (request.getAssetId() != null) {
@@ -113,13 +106,6 @@ public class AssignmentServiceImpl implements AssignmentService {
         taskGroupTimelineRepository.save(tl);
 
         List<TaskGroupRequestEntity> links = taskGroupRequestRepository.findByTaskGroupId(group.getId());
-        for (TaskGroupRequestEntity link : links) {
-            com.floodrescue.module.rescue.entity.RescueRequestEntity rr = link.getRescueRequest();
-            if (rr.getStatus() == RescueRequestStatus.VERIFIED || rr.getStatus() == RescueRequestStatus.PENDING) {
-                rr.setStatus(RescueRequestStatus.ASSIGNED);
-                rescueRequestRepository.save(rr);
-            }
-        }
         List<RescueAssigmentEntity> allAssignments =
                 rescueAssignmentRepository.findByTaskGroupIdAndIsActiveTrue(group.getId());
         List<TaskGroupTimelineEntity> timeline =
@@ -163,4 +149,3 @@ public class AssignmentServiceImpl implements AssignmentService {
         return builder.build();
     }
 }
-

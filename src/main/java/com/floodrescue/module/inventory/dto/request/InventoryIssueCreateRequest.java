@@ -11,10 +11,18 @@ import java.util.List;
 @Setter
 public class InventoryIssueCreateRequest {
 
+    // Liên kết với phiếu yêu cầu cứu trợ
+    private Long reliefRequestId;
+
+    // Đội vận chuyển / thực hiện xuất & giao
+    private Long assignedTeamId;
+
+    // Phương tiện
+    private Long assetId;
+
     private String note;
 
     @NotEmpty(message = "Danh sách dòng phiếu xuất không được để trống")
     @Valid
     private List<InventoryIssueLineRequest> lines;
 }
-

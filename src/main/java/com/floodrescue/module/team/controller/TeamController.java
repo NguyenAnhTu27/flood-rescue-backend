@@ -1,25 +1,48 @@
 package com.floodrescue.module.team.controller;
 
-import com.floodrescue.module.rescue.dto.response.RescueRequestResponse;
+import com.floodrescue.module.team.dto.request.CreateTeamRequest;
+import com.floodrescue.module.team.entity.TeamEntity;
 import com.floodrescue.module.team.service.TeamService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
-@RequestMapping("/api/teams")
+@RequestMapping("/api/admin/teams")
 @RequiredArgsConstructor
 public class TeamController {
 
     private final TeamService teamService;
 
-    @GetMapping("/{teamId}/requests")
-    public ResponseEntity<Page<RescueRequestResponse>> getTeamRequests(
-            @PathVariable Long teamId,
-            @PageableDefault(size = 20) Pageable pageable) {
-        return ResponseEntity.ok(teamService.getAssignedRescueRequests(teamId, pageable));
+    /**
+     * Tạo đội cứu hộ mới (dành cho Admin/Manager).
+     */
+    @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    public ResponseEntity<TeamEntity> createTeam(@Valid @RequestBody CreateTeamRequest request) {
+        TeamEntity team = teamService.createTeam(request);
+        return ResponseEntity.ok(team);
+    }
+
+    /**
+     * Lấy danh sách tất cả đội cứu hộ.
+     */
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','COORDINATOR')")
+    public ResponseEntity<List<TeamEntity>> getTeams() {
+        return ResponseEntity.ok(teamService.getAllTeams());
+    }
+
+    /**
+     * Lấy chi tiết 1 đội cứu hộ theo ID.
+     */
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','COORDINATOR')")
+    public ResponseEntity<TeamEntity> getTeam(@PathVariable Long id) {
+        return ResponseEntity.ok(teamService.getTeamById(id));
     }
 }

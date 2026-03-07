@@ -27,4 +27,3 @@ public class CreateAssetRequest {
 
     private String note;
 }
-

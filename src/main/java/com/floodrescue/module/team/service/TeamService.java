@@ -1,9 +1,15 @@
 package com.floodrescue.module.team.service;
 
-import com.floodrescue.module.rescue.dto.response.RescueRequestResponse;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import com.floodrescue.module.team.dto.request.CreateTeamRequest;
+import com.floodrescue.module.team.entity.TeamEntity;
+
+import java.util.List;
 
 public interface TeamService {
-    Page<RescueRequestResponse> getAssignedRescueRequests(Long teamId, Pageable pageable);
+
+    TeamEntity createTeam(CreateTeamRequest request);
+
+    List<TeamEntity> getAllTeams();
+
+    TeamEntity getTeamById(Long id);
 }
