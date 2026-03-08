@@ -1,6 +1,7 @@
 package com.floodrescue.module.relief.controller;
 
 import com.floodrescue.module.relief.dto.request.ReliefRequestCreateRequest;
+import com.floodrescue.module.relief.dto.request.ReliefRequestRejectRequest;
 import com.floodrescue.module.relief.dto.response.ManagerReliefDashboardResponse;
 import com.floodrescue.module.relief.dto.response.ReliefRequestResponse;
 import com.floodrescue.module.relief.service.ManagerReliefDashboardService;
@@ -73,5 +74,32 @@ public class ReliefRequestController {
             @PageableDefault(size = 20) Pageable pageable
     ) {
         return ResponseEntity.ok(reliefRequestService.listReliefRequests(status, pageable));
+    }
+
+    /**
+     * Duyệt yêu cầu cứu trợ.
+     * FE đang gọi: PUT /api/relief/requests/{id}/approve
+     */
+    @PutMapping("/requests/{id}/approve")
+    public ResponseEntity<ReliefRequestResponse> approveReliefRequest(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        Long userId = getCurrentUserId(authentication);
+        return ResponseEntity.ok(reliefRequestService.approveReliefRequest(id, userId));
+    }
+
+    /**
+     * Từ chối yêu cầu cứu trợ.
+     * FE đang gọi: PUT /api/relief/requests/{id}/reject
+     */
+    @PutMapping("/requests/{id}/reject")
+    public ResponseEntity<ReliefRequestResponse> rejectReliefRequest(
+            @PathVariable Long id,
+            @Valid @RequestBody ReliefRequestRejectRequest request,
+            Authentication authentication
+    ) {
+        Long userId = getCurrentUserId(authentication);
+        return ResponseEntity.ok(reliefRequestService.rejectReliefRequest(id, userId, request.getReason()));
     }
 }
