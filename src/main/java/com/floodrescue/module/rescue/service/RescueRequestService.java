@@ -2,6 +2,7 @@ package com.floodrescue.module.rescue.service;
 
 import com.floodrescue.module.rescue.dto.request.*;
 import com.floodrescue.module.rescue.dto.response.RescueRequestResponse;
+import com.floodrescue.shared.enums.RescuePriority;
 import com.floodrescue.shared.enums.RescueRequestStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +18,8 @@ public interface RescueRequestService {
     Page<RescueRequestResponse> getRescueRequestsByCitizen(Long citizenId, Pageable pageable);
 
     Page<RescueRequestResponse> getRescueRequestsByStatus(RescueRequestStatus status, Pageable pageable);
+
+    Page<RescueRequestResponse> searchRescueRequests(RescueRequestStatus status, RescuePriority priority, String keyword, Pageable pageable);
 
     Page<RescueRequestResponse> getPendingRescueRequests(Pageable pageable);
 

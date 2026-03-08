@@ -8,6 +8,7 @@ import com.floodrescue.module.rescue.service.RescueRequestService;
 import com.floodrescue.module.rescue.service.TaskGroupService;
 import com.floodrescue.module.rescue.service.AssignmentService;
 import com.floodrescue.module.rescue.service.CoordinatorDashboardService;
+import com.floodrescue.shared.enums.RescuePriority;
 import com.floodrescue.shared.enums.RescueRequestStatus;
 import com.floodrescue.shared.enums.TaskGroupStatus;
 import jakarta.validation.Valid;
@@ -41,12 +42,14 @@ public class CoordinatorRescueController {
     @GetMapping("/requests")
     public ResponseEntity<Page<RescueRequestResponse>> getRescueRequests(
             @RequestParam(required = false) RescueRequestStatus status,
+            @RequestParam(required = false) RescuePriority priority,
+            @RequestParam(required = false) String keyword,
             @PageableDefault(size = 20) Pageable pageable) {
         Page<RescueRequestResponse> response;
-        if (status != null) {
-            response = rescueRequestService.getRescueRequestsByStatus(status, pageable);
-        } else {
+        if (status == null && priority == null && keyword == null && pageable.getSort().isUnsorted()) {
             response = rescueRequestService.getPendingRescueRequests(pageable);
+        } else {
+            response = rescueRequestService.searchRescueRequests(status, priority, keyword, pageable);
         }
         return ResponseEntity.ok(response);
     }
