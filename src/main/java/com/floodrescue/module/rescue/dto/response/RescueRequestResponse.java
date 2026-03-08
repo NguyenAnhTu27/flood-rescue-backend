@@ -30,7 +30,21 @@ public class RescueRequestResponse {
     private Integer affectedPeopleCount;
     private String description;
     private String addressText;
+    private Double latitude;
+    private Double longitude;
+    private String locationDescription;
     private Boolean locationVerified;
+    private Boolean waitingForTeam;
+    private String coordinatorCancelNote;
+    private Boolean emergency;
+    private Integer emergencyNo;
+    private String emergencyActionStatus;
+    private Long sourceTeamId;
+    private Long emergencyParentRequestId;
+    private String rescueResultConfirmationStatus;
+    private String rescueResultConfirmationNote;
+    private LocalDateTime rescueResultConfirmedAt;
+    private Boolean waitingCitizenRescueConfirmation;
 
     private List<AttachmentResponse> attachments;
     private List<TimelineResponse> timeline;

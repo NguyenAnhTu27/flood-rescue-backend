@@ -42,6 +42,20 @@ public class TaskGroupResponse {
         private String priority;
         private Integer affectedPeopleCount;
         private String addressText;
+        private Double latitude;
+        private Double longitude;
+        private String locationDescription;
+        private String description;
+        private Boolean locationVerified;
+        private Long citizenId;
+        private String citizenName;
+        private String citizenPhone;
+        private Boolean emergency;
+        private Integer emergencyNo;
+        private Long sourceTeamId;
+        private Long emergencyParentRequestId;
+        private LocalDateTime createdAt;
+        private LocalDateTime updatedAt;
     }
 
     @Getter

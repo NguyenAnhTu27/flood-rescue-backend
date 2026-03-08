@@ -1,6 +1,7 @@
 package com.floodrescue.module.asset.service;
 
 import com.floodrescue.module.asset.dto.request.CreateAssetRequest;
+import com.floodrescue.module.asset.dto.request.AssetStatusUpdateRequest;
 import com.floodrescue.module.asset.dto.response.AssetResponse;
 import com.floodrescue.module.asset.entity.AssetEntity;
 import com.floodrescue.module.asset.repository.AssetReponsitory;
@@ -53,6 +54,23 @@ public class AssetServiceImpl implements AssetService {
                 .stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AssetResponse getAsset(Long id) {
+        AssetEntity asset = assetRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Phương tiện không tồn tại"));
+        return toResponse(asset);
+    }
+
+    @Override
+    @Transactional
+    public AssetResponse updateAssetStatus(Long id, AssetStatusUpdateRequest request) {
+        AssetEntity asset = assetRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Phương tiện không tồn tại"));
+        asset.setStatus(request.getStatus());
+        return toResponse(assetRepository.save(asset));
     }
 
     private AssetResponse toResponse(AssetEntity a) {

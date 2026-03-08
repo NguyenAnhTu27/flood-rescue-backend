@@ -73,13 +73,29 @@ public class TaskGroupMapper {
     }
 
     private TaskGroupResponse.TaskGroupRequestItem toRequestItem(TaskGroupRequestEntity entity) {
+        var request = entity.getRescueRequest();
+        var citizen = request.getCitizen();
         return TaskGroupResponse.TaskGroupRequestItem.builder()
-                .id(entity.getRescueRequest().getId())
-                .code(entity.getRescueRequest().getCode())
-                .status(entity.getRescueRequest().getStatus().name())
-                .priority(entity.getRescueRequest().getPriority().name())
-                .affectedPeopleCount(entity.getRescueRequest().getAffectedPeopleCount())
-                .addressText(entity.getRescueRequest().getAddressText())
+                .id(request.getId())
+                .code(request.getCode())
+                .status(request.getStatus().name())
+                .priority(request.getPriority().name())
+                .affectedPeopleCount(request.getAffectedPeopleCount())
+                .addressText(request.getAddressText())
+                .latitude(request.getLatitude())
+                .longitude(request.getLongitude())
+                .locationDescription(request.getLocationDescription())
+                .description(request.getDescription())
+                .locationVerified(request.getLocationVerified())
+                .citizenId(citizen != null ? citizen.getId() : null)
+                .citizenName(citizen != null ? citizen.getFullName() : null)
+                .citizenPhone(citizen != null ? citizen.getPhone() : null)
+                .emergency(request.getIsEmergency())
+                .emergencyNo(request.getEmergencyNo())
+                .sourceTeamId(request.getSourceTeamId())
+                .emergencyParentRequestId(request.getEmergencyParentRequestId())
+                .createdAt(request.getCreatedAt())
+                .updatedAt(request.getUpdatedAt())
                 .build();
     }
 
@@ -107,10 +123,11 @@ public class TaskGroupMapper {
     }
 
     private TaskGroupResponse.TimelineItem toTimelineItem(TaskGroupTimelineEntity entity) {
+        var actor = entity.getActor();
         return TaskGroupResponse.TimelineItem.builder()
                 .id(entity.getId())
-                .actorId(entity.getActor().getId())
-                .actorName(entity.getActor().getFullName())
+                .actorId(actor != null ? actor.getId() : null)
+                .actorName(actor != null ? actor.getFullName() : "Hệ thống")
                 .eventType(entity.getEventType())
                 .note(entity.getNote())
                 .createdAt(entity.getCreatedAt())

@@ -1,11 +1,15 @@
 package com.floodrescue.module.rescue.service;
 
 import com.floodrescue.module.rescue.dto.request.*;
+import com.floodrescue.module.rescue.dto.response.BlockedCitizenResponse;
+import com.floodrescue.module.rescue.dto.response.CitizenRescueConfirmationResponse;
 import com.floodrescue.module.rescue.dto.response.RescueRequestResponse;
 import com.floodrescue.shared.enums.RescuePriority;
 import com.floodrescue.shared.enums.RescueRequestStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+
+import java.util.List;
 
 public interface RescueRequestService {
 
@@ -36,4 +40,14 @@ public interface RescueRequestService {
     RescueRequestResponse changeStatus(Long id, Long userId, RescueRequestStatus newStatus, String note);
 
     void cancelRescueRequest(Long id, Long citizenId);
+
+    CitizenRescueConfirmationResponse confirmRescueResult(Long requestId, Long citizenId, Boolean rescued, String reason);
+
+    void setCitizenRequestBlockByRequest(Long requestId, Long coordinatorId, boolean blocked, String reason);
+
+    List<BlockedCitizenResponse> getBlockedCitizens();
+
+    void unblockCitizen(Long citizenId, Long coordinatorId, String reason);
+
+    RescueRequestResponse reopenCancelledRequest(Long requestId, Long citizenId, String reason);
 }

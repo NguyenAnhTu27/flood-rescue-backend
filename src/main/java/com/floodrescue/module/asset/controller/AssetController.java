@@ -1,6 +1,7 @@
 package com.floodrescue.module.asset.controller;
 
 import com.floodrescue.module.asset.dto.request.CreateAssetRequest;
+import com.floodrescue.module.asset.dto.request.AssetStatusUpdateRequest;
 import com.floodrescue.module.asset.dto.response.AssetResponse;
 import com.floodrescue.module.asset.service.AssetService;
 import com.floodrescue.shared.enums.AssetStatus;
@@ -38,5 +39,20 @@ public class AssetController {
             @RequestParam(required = false) AssetStatus status
     ) {
         return ResponseEntity.ok(assetService.getAssets(status));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','COORDINATOR')")
+    public ResponseEntity<AssetResponse> getAsset(@PathVariable Long id) {
+        return ResponseEntity.ok(assetService.getAsset(id));
+    }
+
+    @PutMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    public ResponseEntity<AssetResponse> updateAssetStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody AssetStatusUpdateRequest request
+    ) {
+        return ResponseEntity.ok(assetService.updateAssetStatus(id, request));
     }
 }

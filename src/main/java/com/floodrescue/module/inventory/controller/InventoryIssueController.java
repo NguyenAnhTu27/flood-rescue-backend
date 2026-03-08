@@ -1,5 +1,12 @@
 package com.floodrescue.module.inventory.controller;
 
+import com.floodrescue.module.inventory.dto.request.InventoryIssueCreateRequest;
+import com.floodrescue.module.inventory.dto.response.InventoryIssueResponse;
+import com.floodrescue.module.inventory.service.IssueService;
+import com.floodrescue.shared.enums.InventoryDocumentStatus;
+import com.floodrescue.shared.util.CodeGenerator;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -16,13 +23,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.floodrescue.module.inventory.dto.request.InventoryIssueCreateRequest;
-import com.floodrescue.module.inventory.dto.response.InventoryIssueResponse;
-import com.floodrescue.module.inventory.service.IssueService;
-import com.floodrescue.shared.enums.InventoryDocumentStatus;
-
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import java.util.Map;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/inventory/issues")
@@ -49,6 +51,11 @@ public class InventoryIssueController {
         return ResponseEntity.ok(issueService.createIssue(userId, request));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<InventoryIssueResponse> getIssue(@PathVariable Long id) {
+        return ResponseEntity.ok(issueService.getIssue(id));
+    }
+
     @PutMapping("/{id}/approve")
     public ResponseEntity<InventoryIssueResponse> approveIssue(
             @PathVariable Long id,
@@ -67,9 +74,22 @@ public class InventoryIssueController {
         return ResponseEntity.ok(issueService.cancelIssue(id, userId));
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<InventoryIssueResponse> getIssue(@PathVariable Long id) {
-        return ResponseEntity.ok(issueService.getIssue(id));
+    @PutMapping("/{id}/temporary-deduction")
+    public ResponseEntity<InventoryIssueResponse> markTemporaryDeduction(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        Long userId = getCurrentUserId(authentication);
+        return ResponseEntity.ok(issueService.markIssueTemporaryDeduction(id, userId));
+    }
+
+    @PutMapping("/{id}/finalize-deduction")
+    public ResponseEntity<InventoryIssueResponse> finalizeDeduction(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        Long userId = getCurrentUserId(authentication);
+        return ResponseEntity.ok(issueService.finalizeIssueDeduction(id, userId));
     }
 
     @GetMapping
@@ -78,5 +98,15 @@ public class InventoryIssueController {
             @PageableDefault(size = 20) Pageable pageable
     ) {
         return ResponseEntity.ok(issueService.listIssues(status, pageable));
+    }
+
+    @GetMapping("/temporary")
+    public ResponseEntity<List<InventoryIssueResponse>> listTemporaryIssues() {
+        return ResponseEntity.ok(issueService.listIssuesByStatus(InventoryDocumentStatus.APPROVED));
+    }
+
+    @GetMapping("/generate-code")
+    public ResponseEntity<Map<String, String>> generateIssueCode() {
+        return ResponseEntity.ok(Map.of("code", CodeGenerator.generateInventoryIssueCode()));
     }
 }

@@ -14,7 +14,9 @@ public class ItemCategoryResponse {
     private String code;
     private String name;
     private String unit;
+    private Integer classificationId;
+    private String classificationCode;
+    private String classificationName;
     private Boolean isActive;
     private LocalDateTime createdAt;
 }
-

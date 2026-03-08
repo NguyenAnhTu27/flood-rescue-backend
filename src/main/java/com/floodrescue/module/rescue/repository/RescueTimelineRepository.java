@@ -1,6 +1,7 @@
 package com.floodrescue.module.rescue.repository;
 
 import com.floodrescue.module.rescue.entity.RescueRequestTimelineEntity;
+import com.floodrescue.shared.enums.TimelineEventType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,4 +16,6 @@ public interface RescueTimelineRepository extends JpaRepository<RescueRequestTim
             Long rescueRequestId,
             Pageable pageable
     );
+
+    long countByRescueRequestIdAndEventType(Long rescueRequestId, TimelineEventType eventType);
 }

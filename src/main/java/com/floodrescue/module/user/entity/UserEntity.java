@@ -54,6 +54,13 @@ public class UserEntity {
     @Builder.Default
     private Boolean isLeader = false; // true = leader của rescue team
 
+    @Column(name = "rescue_request_blocked", nullable = false)
+    @Builder.Default
+    private Boolean rescueRequestBlocked = false;
+
+    @Column(name = "rescue_request_blocked_reason", columnDefinition = "TEXT")
+    private String rescueRequestBlockedReason;
+
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 

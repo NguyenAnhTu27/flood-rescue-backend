@@ -25,6 +25,7 @@ public class CoordinatorDashboardResponse {
         private Integer peopleCount; // affectedPeopleCount
         private String timeAgo;      // "1p trước"
         private String status;       // PENDING/VERIFIED/...
+        private Boolean waitingForTeam;
         // Map sẽ làm sau => để null
         private Double lat;
         private Double lng;
@@ -60,4 +61,3 @@ public class CoordinatorDashboardResponse {
         private Boolean online;
     }
 }
-

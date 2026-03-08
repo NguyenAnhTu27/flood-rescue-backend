@@ -1,5 +1,6 @@
 package com.floodrescue.module.rescue.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
@@ -12,6 +13,7 @@ public class AssignTaskGroupRequest {
     private Long taskGroupId;
 
     @NotNull(message = "ID đội cứu hộ không được để trống")
+    @JsonAlias({"assignedTeamId", "assigned_team_id"})
     private Long teamId;
 
     // Tài sản có thể null

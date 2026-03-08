@@ -64,9 +64,47 @@ public class RescueRequestEntity {
     @Column(name = "address_text", length = 255)
     private String addressText;
 
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
+    @Column(name = "location_description", length = 500)
+    private String locationDescription;
+
     @Column(name = "location_verified", nullable = false)
     @Builder.Default
     private Boolean locationVerified = false;
+
+    @Column(name = "waiting_for_team", nullable = false)
+    @Builder.Default
+    private Boolean waitingForTeam = false;
+
+    @Column(name = "coordinator_cancel_note", columnDefinition = "TEXT")
+    private String coordinatorCancelNote;
+
+    @Column(name = "is_emergency", nullable = false)
+    @Builder.Default
+    private Boolean isEmergency = false;
+
+    @Column(name = "emergency_no")
+    private Integer emergencyNo;
+
+    @Column(name = "source_team_id")
+    private Long sourceTeamId;
+
+    @Column(name = "emergency_parent_request_id")
+    private Long emergencyParentRequestId;
+
+    @Column(name = "rescue_result_confirmation_status", length = 30)
+    private String rescueResultConfirmationStatus;
+
+    @Column(name = "rescue_result_confirmation_note", columnDefinition = "TEXT")
+    private String rescueResultConfirmationNote;
+
+    @Column(name = "rescue_result_confirmed_at")
+    private LocalDateTime rescueResultConfirmedAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -12,4 +12,11 @@ public class VerifyRequest {
     private Boolean locationVerified;
 
     private String note;
+
+    private Boolean cancelRequest;
+
+    // DELETE: hủy khỏi hệ thống xử lý, WAITING_TEAM: đưa lại hàng đợi với nhãn chờ đội
+    private String cancelAction;
+
+    private String cancelReason;
 }

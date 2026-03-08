@@ -28,6 +28,9 @@ public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(
                             "/api/auth/**",
+                            "/api/public/**",
+                            "/uploads/**",
+                            "/error",
                             "/swagger-ui/**",
                             "/swagger-ui.html",
                             "/api-docs/**"
