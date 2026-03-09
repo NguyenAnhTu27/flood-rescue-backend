@@ -23,6 +23,10 @@ public interface RescueRequestRepository extends JpaRepository<RescueRequestEnti
 
     Page<RescueRequestEntity> findByCitizenId(Long citizenId, Pageable pageable);
 
+    long countByCitizenId(Long citizenId);
+
+    long countByCitizenIdAndStatus(Long citizenId, RescueRequestStatus status);
+
     Page<RescueRequestEntity> findByStatusAndPriorityOrderByAffectedPeopleCountDescCreatedAtAsc(
             RescueRequestStatus status,
             RescuePriority priority,

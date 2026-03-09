@@ -9,11 +9,12 @@ import com.floodrescue.shared.enums.AttachmentFileType;
 import com.floodrescue.module.rescue.service.RescueRequestService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -31,6 +32,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/rescue/citizen")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('CITIZEN')")
 public class CitizenRescueController {
 
     private final RescueRequestService rescueRequestService;
@@ -65,8 +67,13 @@ public class CitizenRescueController {
     }
 
     @GetMapping("/requests/{id}")
-    public ResponseEntity<RescueRequestResponse> getRescueRequestById(@PathVariable Long id) {
+    public ResponseEntity<?> getRescueRequestById(@PathVariable Long id, Authentication authentication) {
+        Long citizenId = getCurrentUserId(authentication);
         RescueRequestResponse response = rescueRequestService.getRescueRequestById(id);
+
+        if (response.getCitizenId() == null || !response.getCitizenId().equals(citizenId)) {
+            return ResponseEntity.status(403).body(Map.of("message", "Bạn không có quyền xem yêu cầu này"));
+        }
         return ResponseEntity.ok(response);
     }
 
@@ -99,10 +106,6 @@ public class CitizenRescueController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Upload one or more image files for rescue request attachments.
-     * Returns list of fileUrl + fileType to be sent back in RescueRequestCreateRequest.attachments.
-     */
     @PostMapping("/attachments")
     public ResponseEntity<List<AttachmentUploadResponse>> uploadAttachments(
             @RequestParam("files") List<MultipartFile> files
@@ -119,7 +122,9 @@ public class CitizenRescueController {
         List<AttachmentUploadResponse> result = new ArrayList<>();
 
         for (MultipartFile file : files) {
-            if (file.isEmpty()) continue;
+            if (file.isEmpty()) {
+                continue;
+            }
 
             String originalName = file.getOriginalFilename();
             String ext = "";
@@ -129,15 +134,9 @@ public class CitizenRescueController {
 
             String newFileName = UUID.randomUUID() + ext;
             Path target = uploadPath.resolve(newFileName);
-
-            // Use Path-based transfer to avoid Tomcat writing into its temp dir
-            // and to ensure parent directories are respected
             file.transferTo(target);
 
-            // File will be accessible via /uploads/rescue/{newFileName}
-            // Ensure fileUrl starts with / and uses forward slashes
             String fileUrl = "/uploads/rescue/" + newFileName;
-            // Normalize to ensure consistent format (remove any double slashes, etc.)
             fileUrl = fileUrl.replaceAll("/+", "/");
 
             result.add(AttachmentUploadResponse.builder()

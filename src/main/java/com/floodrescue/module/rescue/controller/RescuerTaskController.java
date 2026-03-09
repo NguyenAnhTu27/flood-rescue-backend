@@ -14,6 +14,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/rescue/rescuer")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('RESCUER')")
 public class RescuerTaskController {
 
     private final RescueRequestService rescueRequestService;
@@ -107,3 +109,5 @@ public class RescuerTaskController {
         return ResponseEntity.ok(rescuerTaskService.updateMyTaskGroupStatus(userId, id, status, note));
     }
 }
+
+
