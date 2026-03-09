@@ -82,3 +82,4 @@ Kết luận: khi backend chạy cổng khác (vd `18080`) thì nút vẫn gọi
 2. Bỏ/điều chỉnh `updateAsset`, `deleteAsset` trong `features/assets/api.js` theo backend hiện có.
 3. Sửa `approveReliefRequest` thành `/approve-dispatch` hoặc bỏ hàm nếu không dùng.
 4. Loại hardcode `http://localhost:8080`; chuyển toàn bộ về `httpClient` + biến môi trường.
+ sửa cho commit
