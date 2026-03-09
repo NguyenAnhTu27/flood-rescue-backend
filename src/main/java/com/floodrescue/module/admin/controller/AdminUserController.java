@@ -105,8 +105,9 @@ public class AdminUserController {
         );
     }
 
-    @GetMapping("/teams")
+    @GetMapping("/team-options")
     public ResponseEntity<?> teams() {
         return ResponseEntity.ok(adminUserService.getTeams());
     }
 }
+

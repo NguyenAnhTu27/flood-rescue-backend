@@ -46,17 +46,17 @@ public class InventoryIssueEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "relief_request_id",
-            foreignKey = @ForeignKey(name = "fk_issue_relief"))
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private ReliefRequestEntity reliefRequest;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assigned_team_id",
-            foreignKey = @ForeignKey(name = "fk_issue_team"))
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private TeamEntity assignedTeam;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "asset_id",
-            foreignKey = @ForeignKey(name = "fk_issue_asset"))
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private AssetEntity asset;
 
     @Column(columnDefinition = "TEXT")
@@ -79,3 +79,4 @@ public class InventoryIssueEntity {
         updatedAt = LocalDateTime.now();
     }
 }
+
