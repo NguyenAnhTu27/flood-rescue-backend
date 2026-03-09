@@ -25,13 +25,11 @@ public class UserEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Role bắt buộc
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "role_id", nullable = false,
             foreignKey = @ForeignKey(name = "fk_users_role"))
     private RoleEntity role;
 
-    // Citizen có thể không thuộc team => nullable
     @Column(name = "team_id")
     private Long teamId;
 
@@ -48,14 +46,28 @@ public class UserEntity {
     private String passwordHash;
 
     @Column(nullable = false)
-    private Byte status; // 1 active, 0 inactive
+    private Byte status;
 
-    @Column(name = "is_leader", nullable = false)
-    @Builder.Default
-    private Boolean isLeader = false; // true = leader của rescue team
+    @Column(name = "is_leader")
+    private Boolean isLeader;
+
+    @Column(name = "rescue_request_blocked")
+    private Boolean rescueRequestBlocked;
+
+    @Column(name = "rescue_request_blocked_reason", length = 255)
+    private String rescueRequestBlockedReason;
 
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
+
+    @Column(name = "failed_login_attempts")
+    private Integer failedLoginAttempts;
+
+    @Column(name = "locked_at")
+    private LocalDateTime lockedAt;
+
+    @Column(name = "temp_locked_until")
+    private LocalDateTime tempLockedUntil;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

@@ -2,8 +2,12 @@ package com.floodrescue.module.rescue.controller;
 
 import com.floodrescue.module.rescue.dto.request.AddNoteRequest;
 import com.floodrescue.module.rescue.dto.response.RescueRequestResponse;
+import com.floodrescue.module.rescue.dto.response.RescuerDashboardResponse;
+import com.floodrescue.module.rescue.dto.response.TaskGroupResponse;
 import com.floodrescue.module.rescue.service.RescueRequestService;
+import com.floodrescue.module.rescue.service.RescuerTaskService;
 import com.floodrescue.shared.enums.RescueRequestStatus;
+import com.floodrescue.shared.enums.TaskGroupStatus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -20,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 public class RescuerTaskController {
 
     private final RescueRequestService rescueRequestService;
+    private final RescuerTaskService rescuerTaskService;
 
     private Long getCurrentUserId(Authentication authentication) {
         if (authentication == null || authentication.getPrincipal() == null) {
@@ -67,5 +72,38 @@ public class RescuerTaskController {
         Long userId = getCurrentUserId(authentication);
         RescueRequestResponse response = rescueRequestService.addNote(id, userId, request);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/dashboard")
+    public ResponseEntity<RescuerDashboardResponse> getDashboard(Authentication authentication) {
+        Long userId = getCurrentUserId(authentication);
+        return ResponseEntity.ok(rescuerTaskService.getDashboard(userId));
+    }
+
+    @GetMapping("/task-groups")
+    public ResponseEntity<Page<TaskGroupResponse>> getMyTaskGroups(
+            @RequestParam(required = false) TaskGroupStatus status,
+            @PageableDefault(size = 20) Pageable pageable,
+            Authentication authentication) {
+        Long userId = getCurrentUserId(authentication);
+        return ResponseEntity.ok(rescuerTaskService.getMyTaskGroups(userId, status, pageable));
+    }
+
+    @GetMapping("/task-groups/{id}")
+    public ResponseEntity<TaskGroupResponse> getMyTaskGroup(
+            @PathVariable Long id,
+            Authentication authentication) {
+        Long userId = getCurrentUserId(authentication);
+        return ResponseEntity.ok(rescuerTaskService.getMyTaskGroup(userId, id));
+    }
+
+    @PutMapping("/task-groups/{id}/status")
+    public ResponseEntity<TaskGroupResponse> updateMyTaskGroupStatus(
+            @PathVariable Long id,
+            @RequestParam TaskGroupStatus status,
+            @RequestParam(required = false) String note,
+            Authentication authentication) {
+        Long userId = getCurrentUserId(authentication);
+        return ResponseEntity.ok(rescuerTaskService.updateMyTaskGroupStatus(userId, id, status, note));
     }
 }
