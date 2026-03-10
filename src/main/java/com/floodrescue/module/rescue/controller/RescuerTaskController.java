@@ -148,4 +148,14 @@ public class RescuerTaskController {
         );
         return ResponseEntity.ok(Map.of("message", "Đã cập nhật vị trí đội cứu hộ"));
     }
+
+    @PostMapping("/assets/return")
+    public ResponseEntity<?> returnMyTeamAssets(Authentication authentication) {
+        Long userId = getCurrentUserId(authentication);
+        long returnedCount = rescuerTaskService.returnMyTeamAssets(userId);
+        return ResponseEntity.ok(Map.of(
+                "message", "Đã trả tài sản về trạng thái sẵn sàng",
+                "returnedAssetCount", returnedCount
+        ));
+    }
 }

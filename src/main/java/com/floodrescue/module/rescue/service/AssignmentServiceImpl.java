@@ -74,8 +74,24 @@ public class AssignmentServiceImpl implements AssignmentService {
             asset = assetRepository.findById(request.getAssetId())
                     .orElseThrow(() -> new NotFoundException("Phương tiện / thiết bị không tồn tại"));
 
-            if (asset.getStatus() != AssetStatus.AVAILABLE) {
+            if (asset.getAssignedTeam() != null
+                    && asset.getAssignedTeam().getId() != null
+                    && !asset.getAssignedTeam().getId().equals(team.getId())) {
+                throw new BusinessException("Phương tiện đang thuộc đội khác, không thể phân cho đội này");
+            }
+
+            boolean isHeldBySameTeam = asset.getAssignedTeam() != null
+                    && asset.getAssignedTeam().getId() != null
+                    && asset.getAssignedTeam().getId().equals(team.getId());
+
+            if (!isHeldBySameTeam && asset.getStatus() != AssetStatus.AVAILABLE) {
                 throw new BusinessException("Phương tiện / thiết bị không sẵn sàng");
+            }
+
+            if (isHeldBySameTeam
+                    && asset.getStatus() != AssetStatus.AVAILABLE
+                    && asset.getStatus() != AssetStatus.IN_USE) {
+                throw new BusinessException("Phương tiện của đội hiện không khả dụng cho nhiệm vụ");
             }
         }
 

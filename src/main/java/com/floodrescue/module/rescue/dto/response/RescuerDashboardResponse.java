@@ -20,7 +20,19 @@ public class RescuerDashboardResponse {
 
     private Long activeTaskGroups;
     private Long activeAssignments;
+    private List<HeldAssetItem> heldAssets;
 
     // Danh sách nhóm nhiệm vụ gần nhất/đang hoạt động của đội
     private List<TaskGroupResponse> taskGroups;
+
+    @Getter
+    @Setter
+    @Builder
+    public static class HeldAssetItem {
+        private Long id;
+        private String code;
+        private String name;
+        private String assetType;
+        private String status;
+    }
 }

@@ -12,6 +12,8 @@ public interface AssetReponsitory extends JpaRepository<AssetEntity, Long> {
 
     List<AssetEntity> findByStatus(AssetStatus status);
 
+    List<AssetEntity> findByAssignedTeamId(Long teamId);
+
     List<AssetEntity> findByAssignedTeamIdAndStatus(Long teamId, AssetStatus status);
 
     @Query("""

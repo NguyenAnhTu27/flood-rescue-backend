@@ -22,4 +22,6 @@ public interface RescuerTaskService {
     java.util.List<EmergencyAckResponse> getEmergencyAcks(Long rescuerUserId, Long taskGroupId);
 
     void updateMyTeamLocation(Long rescuerUserId, Double latitude, Double longitude, String locationText);
+
+    long returnMyTeamAssets(Long rescuerUserId);
 }

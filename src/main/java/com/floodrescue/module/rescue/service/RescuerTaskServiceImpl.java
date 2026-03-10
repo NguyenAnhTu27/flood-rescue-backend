@@ -1,5 +1,7 @@
 package com.floodrescue.module.rescue.service;
 
+import com.floodrescue.module.asset.entity.AssetEntity;
+import com.floodrescue.module.asset.repository.AssetReponsitory;
 import com.floodrescue.module.rescue.dto.response.RescuerDashboardResponse;
 import com.floodrescue.module.rescue.dto.response.TaskGroupResponse;
 import com.floodrescue.module.rescue.dto.request.EscalateTaskGroupRequest;
@@ -20,6 +22,7 @@ import com.floodrescue.module.team.entity.TeamEntity;
 import com.floodrescue.module.team.repository.TeamRepository;
 import com.floodrescue.module.user.entity.UserEntity;
 import com.floodrescue.module.user.repository.UserRepository;
+import com.floodrescue.shared.enums.AssetStatus;
 import com.floodrescue.shared.enums.RescueRequestStatus;
 import com.floodrescue.shared.enums.TaskGroupStatus;
 import com.floodrescue.shared.enums.RescuePriority;
@@ -44,6 +47,7 @@ public class RescuerTaskServiceImpl implements RescuerTaskService {
     private final TaskGroupTimelineRepository taskGroupTimelineRepository;
     private final RescueAssignmentRepository rescueAssignmentRepository;
     private final RescueRequestRepository rescueRequestRepository;
+    private final AssetReponsitory assetRepository;
     private final TaskGroupMapper taskGroupMapper;
     private final NotificationService notificationService;
 
@@ -72,6 +76,15 @@ public class RescuerTaskServiceImpl implements RescuerTaskService {
         List<TaskGroupResponse> groups = groupsPage.getContent().stream()
                 .map(taskGroupMapper::toResponse)
                 .toList();
+        List<RescuerDashboardResponse.HeldAssetItem> heldAssets = assetRepository.findByAssignedTeamId(teamId).stream()
+                .map(asset -> RescuerDashboardResponse.HeldAssetItem.builder()
+                        .id(asset.getId())
+                        .code(asset.getCode())
+                        .name(asset.getName())
+                        .assetType(asset.getAssetType())
+                        .status(asset.getStatus() != null ? asset.getStatus().name() : null)
+                        .build())
+                .toList();
 
         return RescuerDashboardResponse.builder()
                 .teamId(team.getId())
@@ -82,6 +95,7 @@ public class RescuerTaskServiceImpl implements RescuerTaskService {
                 .teamLocationUpdatedAt(team.getCurrentLocationUpdatedAt())
                 .activeAssignments((long) activeAssignments.size())
                 .activeTaskGroups(groupsPage.getTotalElements())
+                .heldAssets(heldAssets)
                 .taskGroups(groups)
                 .build();
     }
@@ -215,6 +229,38 @@ public class RescuerTaskServiceImpl implements RescuerTaskService {
         }
 
         return getMyTaskGroup(rescuerUserId, taskGroupId);
+    }
+
+    @Override
+    @Transactional
+    public long returnMyTeamAssets(Long rescuerUserId) {
+        Long teamId = getRequiredTeamId(rescuerUserId);
+        List<TaskGroupStatus> activeStatuses = List.of(TaskGroupStatus.NEW, TaskGroupStatus.ASSIGNED, TaskGroupStatus.IN_PROGRESS);
+        boolean hasActiveTask = taskGroupRepository
+                .findByAssignedTeamIdAndStatusIn(teamId, activeStatuses, Pageable.ofSize(1))
+                .hasContent();
+        if (hasActiveTask) {
+            throw new BusinessException("Không thể trả tài sản khi đội vẫn còn nhiệm vụ đang hoạt động");
+        }
+
+        List<AssetEntity> heldAssets = assetRepository.findByAssignedTeamId(teamId);
+        if (heldAssets.isEmpty()) {
+            return 0L;
+        }
+
+        List<RescueAssigmentEntity> activeAssignments = rescueAssignmentRepository.findByTeamIdAndIsActiveTrue(teamId);
+        if (!activeAssignments.isEmpty()) {
+            activeAssignments.forEach(a -> a.setIsActive(false));
+            rescueAssignmentRepository.saveAll(activeAssignments);
+        }
+
+        heldAssets.forEach(asset -> {
+            asset.setStatus(AssetStatus.AVAILABLE);
+            asset.setAssignedTeam(null);
+        });
+        assetRepository.saveAll(heldAssets);
+
+        return heldAssets.size();
     }
 
     @Override
