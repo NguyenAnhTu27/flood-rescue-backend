@@ -1,4 +1,4 @@
-package com.floodrescue.module.relief.reponsitory;
+package com.floodrescue.module.relief.repository;
 
 import com.floodrescue.module.relief.entity.DistributionAssignmentEntity;
 import com.floodrescue.module.relief.entity.DistributionEntity;

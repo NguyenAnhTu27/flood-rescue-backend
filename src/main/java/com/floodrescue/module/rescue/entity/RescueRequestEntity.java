@@ -64,6 +64,12 @@ public class RescueRequestEntity {
     @Column(name = "address_text", length = 255)
     private String addressText;
 
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
     @Column(name = "location_verified", nullable = false)
     @Builder.Default
     private Boolean locationVerified = false;

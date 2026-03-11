@@ -2,7 +2,7 @@ package com.floodrescue.module.rescue.service;
 
 import com.floodrescue.module.rescue.dto.response.RescuerDashboardResponse;
 import com.floodrescue.module.rescue.dto.response.TaskGroupResponse;
-import com.floodrescue.module.rescue.entity.RescueAssigmentEntity;
+import com.floodrescue.module.rescue.entity.RescueAssignmentEntity;
 import com.floodrescue.module.rescue.entity.TaskGroupEntity;
 import com.floodrescue.module.rescue.entity.TaskGroupRequestEntity;
 import com.floodrescue.module.rescue.entity.TaskGroupTimelineEntity;
@@ -47,7 +47,7 @@ public class RescuerTaskServiceImpl implements RescuerTaskService {
                 .orElseThrow(() -> new NotFoundException("Đội cứu hộ không tồn tại"));
 
         // Active assignments of this team
-        List<RescueAssigmentEntity> activeAssignments = rescueAssignmentRepository.findByTeamIdAndIsActiveTrue(teamId);
+        List<RescueAssignmentEntity> activeAssignments = rescueAssignmentRepository.findByTeamIdAndIsActiveTrue(teamId);
 
         // Task groups assigned to this team (paged latest)
         Page<TaskGroupEntity> groupsPage = taskGroupRepository.findByAssignedTeamId(teamId, Pageable.ofSize(10));
@@ -89,7 +89,7 @@ public class RescuerTaskServiceImpl implements RescuerTaskService {
         verifyGroupBelongsToTeam(group, teamId);
 
         List<TaskGroupRequestEntity> links = taskGroupRequestRepository.findByTaskGroupId(group.getId());
-        List<RescueAssigmentEntity> assignments = rescueAssignmentRepository.findByTaskGroupIdAndIsActiveTrue(group.getId());
+        List<RescueAssignmentEntity> assignments = rescueAssignmentRepository.findByTaskGroupIdAndIsActiveTrue(group.getId());
         List<TaskGroupTimelineEntity> timeline = taskGroupTimelineRepository.findByTaskGroupIdOrderByCreatedAtDesc(group.getId());
 
         return taskGroupMapper.toResponseWithDetails(group, links, assignments, timeline);
