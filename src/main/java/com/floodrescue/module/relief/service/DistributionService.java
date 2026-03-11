@@ -1,7 +1,7 @@
 package com.floodrescue.module.relief.service;
 
 import com.floodrescue.module.asset.entity.AssetEntity;
-import com.floodrescue.module.asset.repository.AssetReponsitory;
+import com.floodrescue.module.asset.repository.AssetRepository;
 import com.floodrescue.module.inventory.entity.InventoryIssueEntity;
 import com.floodrescue.module.inventory.entity.ItemCategoryEntity;
 import com.floodrescue.module.inventory.repository.IssueRepository;
@@ -13,10 +13,10 @@ import com.floodrescue.module.relief.entity.DistributionAssignmentEntity;
 import com.floodrescue.module.relief.entity.DistributionEntity;
 import com.floodrescue.module.relief.entity.DistributionLineEntity;
 import com.floodrescue.module.relief.entity.ReliefRequestEntity;
-import com.floodrescue.module.relief.reponsitory.DistributionAssignmentRepository;
-import com.floodrescue.module.relief.reponsitory.DistributionLineRepository;
-import com.floodrescue.module.relief.reponsitory.DistributionRepository;
-import com.floodrescue.module.relief.reponsitory.ReliefRequestRepository;
+import com.floodrescue.module.relief.repository.DistributionAssignmentRepository;
+import com.floodrescue.module.relief.repository.DistributionLineRepository;
+import com.floodrescue.module.relief.repository.DistributionRepository;
+import com.floodrescue.module.relief.repository.ReliefRequestRepository;
 import com.floodrescue.module.team.entity.TeamEntity;
 import com.floodrescue.module.team.repository.TeamRepository;
 import com.floodrescue.shared.enums.DistributionPriority;
@@ -45,7 +45,7 @@ public class DistributionService {
     private final ReliefRequestRepository reliefRequestRepository;
     private final IssueRepository issueRepository;
     private final TeamRepository teamRepository;
-    private final AssetReponsitory assetRepository;
+    private final AssetRepository assetRepository;
     private final ItemCategoryRepository itemCategoryRepository;
 
     @Transactional

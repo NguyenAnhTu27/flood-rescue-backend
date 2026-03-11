@@ -1,5 +1,7 @@
 package com.floodrescue.module.team.entity;
 
+import com.floodrescue.shared.enums.TeamStatus;
+import com.floodrescue.shared.enums.TeamType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -28,6 +30,25 @@ public class TeamEntity {
 
     @Column(length = 255)
     private String description;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "team_type", nullable = false, length = 20)
+    @Builder.Default
+    private TeamType teamType = TeamType.RESCUE;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private TeamStatus status = TeamStatus.ACTIVE;
+
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
+    @Column(name = "last_location_update")
+    private LocalDateTime lastLocationUpdate;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

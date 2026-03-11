@@ -1,5 +1,7 @@
 package com.floodrescue.module.rescue.service;
 
+import com.floodrescue.module.map.dto.GeocodingResponse;
+import com.floodrescue.module.map.service.MapboxService;
 import com.floodrescue.module.rescue.dto.request.*;
 import com.floodrescue.module.rescue.dto.response.RescueRequestResponse;
 import com.floodrescue.module.rescue.entity.RescueRequestAttachmentEntity;
@@ -18,6 +20,7 @@ import com.floodrescue.shared.exception.BusinessException;
 import com.floodrescue.shared.exception.NotFoundException;
 import com.floodrescue.shared.util.CodeGenerator;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -27,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RescueRequestServiceImpl implements RescueRequestService {
@@ -36,6 +40,7 @@ public class RescueRequestServiceImpl implements RescueRequestService {
     private final RescueTimelineRepository timelineRepository;
     private final UserRepository userRepository;
     private final RescueRequestMapper mapper;
+    private final MapboxService mapboxService;
 
     @Override
     @Transactional
@@ -62,8 +67,22 @@ public class RescueRequestServiceImpl implements RescueRequestService {
                 .affectedPeopleCount(request.getAffectedPeopleCount())
                 .description(request.getDescription())
                 .addressText(request.getAddressText())
+                .latitude(request.getLatitude())
+                .longitude(request.getLongitude())
                 .locationVerified(false)
                 .build();
+
+        // Auto-geocode if lat/lng not provided but addressText is available
+        if (entity.getLatitude() == null && entity.getLongitude() == null
+                && entity.getAddressText() != null && !entity.getAddressText().isBlank()) {
+            try {
+                GeocodingResponse geo = mapboxService.geocode(entity.getAddressText());
+                entity.setLatitude(geo.getLatitude());
+                entity.setLongitude(geo.getLongitude());
+            } catch (Exception e) {
+                log.warn("Auto-geocode failed for address '{}': {}", entity.getAddressText(), e.getMessage());
+            }
+        }
 
         final RescueRequestEntity savedEntity = rescueRequestRepository.save(entity);
 
