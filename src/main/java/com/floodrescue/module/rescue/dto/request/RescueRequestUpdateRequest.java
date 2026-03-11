@@ -1,9 +1,12 @@
 package com.floodrescue.module.rescue.dto.request;
 
+import com.floodrescue.shared.enums.AttachmentFileType;
 import com.floodrescue.shared.enums.RescuePriority;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.util.List;
 
 @Getter
 @Setter
@@ -19,4 +22,16 @@ public class RescueRequestUpdateRequest {
     private String addressText;
 
     private RescuePriority priority;
+
+    private List<AttachmentRequest> attachments;
+
+    @Getter
+    @Setter
+    public static class AttachmentRequest {
+        @NotBlank(message = "URL file không được để trống")
+        @Size(max = 500, message = "URL file không được vượt quá 500 ký tự")
+        private String fileUrl;
+
+        private AttachmentFileType fileType;
+    }
 }

@@ -5,8 +5,10 @@ import com.floodrescue.module.rescue.dto.response.CoordinatorDashboardResponse;
 import com.floodrescue.module.rescue.repository.RescueAssignmentRepository;
 import com.floodrescue.shared.enums.AssetType;
 import com.floodrescue.module.rescue.repository.RescueRequestRepository;
+import com.floodrescue.module.rescue.repository.TaskGroupRepository;
 import com.floodrescue.module.team.repository.TeamRepository;
 import com.floodrescue.shared.enums.RescueRequestStatus;
+import com.floodrescue.shared.enums.TaskGroupStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,7 @@ public class CoordinatorDashboardServiceImpl implements CoordinatorDashboardServ
     private final TeamRepository teamRepository;
     private final AssetRepository assetRepository;
     private final RescueAssignmentRepository rescueAssignmentRepository;
+    private final TaskGroupRepository taskGroupRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -42,28 +45,32 @@ public class CoordinatorDashboardServiceImpl implements CoordinatorDashboardServ
                         .priority(r.getPriority() != null ? r.getPriority().name() : null)
                         .peopleCount(r.getAffectedPeopleCount())
                         .status(r.getStatus() != null ? r.getStatus().name() : null)
+                        .waitingForTeam(r.getWaitingForTeam())
                         .timeAgo(formatTimeAgo(r.getCreatedAt()))
-                        .lat(null)
-                        .lng(null)
+                        .lat(r.getLatitude())
+                        .lng(r.getLongitude())
                         .build())
                 .toList();
 
-        // 2) Teams: AVAILABLE/BUSY dựa theo active assignment
-        Set<Long> busyTeamIds = rescueAssignmentRepository.findAll().stream()
-                .filter(a -> Boolean.TRUE.equals(a.getIsActive()))
-                .map(a -> a.getTeam().getId())
+        // 2) Teams: BUSY khi có ít nhất 1 task group IN_PROGRESS
+        Set<Long> busyTeamIds = taskGroupRepository.findByStatus(
+                        TaskGroupStatus.IN_PROGRESS,
+                        PageRequest.of(0, 1000)
+                ).getContent().stream()
+                .filter(g -> g.getAssignedTeam() != null && g.getAssignedTeam().getId() != null)
+                .map(g -> g.getAssignedTeam().getId())
                 .collect(Collectors.toSet());
 
         var teams = teamRepository.findAll().stream()
                 .map(t -> CoordinatorDashboardResponse.TeamItem.builder()
                         .id(t.getId())
                         .name(t.getName())
-                        .area(t.getDescription()) // tạm dùng description làm area
+                        .area(t.getCurrentLocationText() != null ? t.getCurrentLocationText() : t.getDescription())
                         .status(busyTeamIds.contains(t.getId()) ? "BUSY" : "AVAILABLE")
                         .distance(null)
-                        .lastUpdate(null)
-                        .lat(null)
-                        .lng(null)
+                        .lastUpdate(formatTimeAgo(t.getCurrentLocationUpdatedAt()))
+                        .lat(t.getCurrentLatitude())
+                        .lng(t.getCurrentLongitude())
                         .online(true)
                         .build())
                 .toList();

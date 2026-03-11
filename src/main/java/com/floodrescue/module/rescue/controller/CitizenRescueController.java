@@ -1,9 +1,12 @@
 package com.floodrescue.module.rescue.controller;
 
 import com.floodrescue.module.rescue.dto.request.AddNoteRequest;
+import com.floodrescue.module.rescue.dto.request.ConfirmRescueResultRequest;
 import com.floodrescue.module.rescue.dto.request.RescueRequestCreateRequest;
+import com.floodrescue.module.rescue.dto.request.ReopenCancelledRequest;
 import com.floodrescue.module.rescue.dto.request.RescueRequestUpdateRequest;
 import com.floodrescue.module.rescue.dto.response.AttachmentUploadResponse;
+import com.floodrescue.module.rescue.dto.response.CitizenRescueConfirmationResponse;
 import com.floodrescue.module.rescue.dto.response.RescueRequestResponse;
 import com.floodrescue.shared.enums.AttachmentFileType;
 import com.floodrescue.module.rescue.service.RescueRequestService;
@@ -97,6 +100,32 @@ public class CitizenRescueController {
         Long userId = getCurrentUserId(authentication);
         RescueRequestResponse response = rescueRequestService.addNote(id, userId, request);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/requests/{id}/confirm-result")
+    public ResponseEntity<CitizenRescueConfirmationResponse> confirmRescueResult(
+            @PathVariable Long id,
+            @Valid @RequestBody ConfirmRescueResultRequest request,
+            Authentication authentication
+    ) {
+        Long citizenId = getCurrentUserId(authentication);
+        CitizenRescueConfirmationResponse response = rescueRequestService.confirmRescueResult(
+                id,
+                citizenId,
+                request.getRescued(),
+                request.getReason()
+        );
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/requests/{id}/reopen")
+    public ResponseEntity<RescueRequestResponse> reopenCancelledRequest(
+            @PathVariable Long id,
+            @Valid @RequestBody ReopenCancelledRequest request,
+            Authentication authentication
+    ) {
+        Long citizenId = getCurrentUserId(authentication);
+        return ResponseEntity.ok(rescueRequestService.reopenCancelledRequest(id, citizenId, request.getReason()));
     }
 
     /**

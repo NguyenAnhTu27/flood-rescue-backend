@@ -2,6 +2,7 @@ package com.floodrescue.module.relief.entity;
 
 import com.floodrescue.module.rescue.entity.RescueRequestEntity;
 import com.floodrescue.shared.enums.InventoryDocumentStatus;
+import com.floodrescue.shared.enums.ReliefDeliveryStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -42,6 +43,35 @@ public class ReliefRequestEntity {
 
     @Column(name = "target_area", nullable = false, length = 255)
     private String targetArea;
+
+    @Column(name = "address_text", length = 255)
+    private String addressText;
+
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
+    @Column(name = "location_description", length = 500)
+    private String locationDescription;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "delivery_status", nullable = false, length = 40)
+    @Builder.Default
+    private ReliefDeliveryStatus deliveryStatus = ReliefDeliveryStatus.REQUESTED;
+
+    @Column(name = "assigned_team_id")
+    private Long assignedTeamId;
+
+    @Column(name = "approved_by")
+    private Long approvedById;
+
+    @Column(name = "assigned_issue_id")
+    private Long assignedIssueId;
+
+    @Column(name = "delivery_note", columnDefinition = "TEXT")
+    private String deliveryNote;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "rescue_request_id",

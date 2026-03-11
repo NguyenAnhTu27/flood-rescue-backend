@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface IssueRepository extends JpaRepository<InventoryIssueEntity, Long> {
@@ -13,4 +14,8 @@ public interface IssueRepository extends JpaRepository<InventoryIssueEntity, Lon
     Optional<InventoryIssueEntity> findByCode(String code);
 
     Page<InventoryIssueEntity> findByStatus(InventoryDocumentStatus status, Pageable pageable);
+
+    Optional<InventoryIssueEntity> findFirstByReliefRequestIdOrderByIdDesc(Long reliefRequestId);
+
+    List<InventoryIssueEntity> findByStatusOrderByUpdatedAtDesc(InventoryDocumentStatus status);
 }

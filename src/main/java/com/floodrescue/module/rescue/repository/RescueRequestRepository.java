@@ -31,6 +31,8 @@ public interface RescueRequestRepository extends JpaRepository<RescueRequestEnti
 
     List<RescueRequestEntity> findByMasterRequestId(Long masterRequestId);
 
+    long countByEmergencyParentRequestId(Long emergencyParentRequestId);
+
     @Query("""
             SELECT r
             FROM RescueRequestEntity r

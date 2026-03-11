@@ -1,5 +1,11 @@
 package com.floodrescue.module.inventory.controller;
 
+import com.floodrescue.module.inventory.dto.request.InventoryReceiptCreateRequest;
+import com.floodrescue.module.inventory.dto.response.InventoryReceiptResponse;
+import com.floodrescue.module.inventory.service.ReceiptService;
+import com.floodrescue.shared.enums.InventoryDocumentStatus;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -15,14 +21,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import com.floodrescue.module.inventory.dto.request.InventoryReceiptCreateRequest;
-import com.floodrescue.module.inventory.dto.response.InventoryReceiptResponse;
-import com.floodrescue.module.inventory.service.ReceiptService;
-import com.floodrescue.shared.enums.InventoryDocumentStatus;
-
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/inventory/receipts")
@@ -49,6 +47,11 @@ public class InventoryReceiptController {
         return ResponseEntity.ok(receiptService.createReceipt(userId, request));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<InventoryReceiptResponse> getReceipt(@PathVariable Long id) {
+        return ResponseEntity.ok(receiptService.getReceipt(id));
+    }
+
     @PutMapping("/{id}/approve")
     public ResponseEntity<InventoryReceiptResponse> approveReceipt(
             @PathVariable Long id,
@@ -65,11 +68,6 @@ public class InventoryReceiptController {
     ) {
         Long userId = getCurrentUserId(authentication);
         return ResponseEntity.ok(receiptService.cancelReceipt(id, userId));
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<InventoryReceiptResponse> getReceipt(@PathVariable Long id) {
-        return ResponseEntity.ok(receiptService.getReceipt(id));
     }
 
     @GetMapping

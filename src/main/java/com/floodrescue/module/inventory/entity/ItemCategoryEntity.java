@@ -34,6 +34,11 @@ public class ItemCategoryEntity {
     @Column(nullable = false, length = 20)
     private String unit;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "classification_id",
+            foreignKey = @ForeignKey(name = "fk_item_cat_classification"))
+    private ItemClassificationEntity classification;
+
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private Boolean isActive = Boolean.TRUE;

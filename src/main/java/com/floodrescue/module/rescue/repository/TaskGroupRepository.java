@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
+import java.util.List;
 
 public interface TaskGroupRepository extends JpaRepository<TaskGroupEntity, Long> {
 
@@ -17,4 +18,6 @@ public interface TaskGroupRepository extends JpaRepository<TaskGroupEntity, Long
     Page<TaskGroupEntity> findByAssignedTeamId(Long teamId, Pageable pageable);
 
     Page<TaskGroupEntity> findByAssignedTeamIdAndStatus(Long teamId, TaskGroupStatus status, Pageable pageable);
+
+    Page<TaskGroupEntity> findByAssignedTeamIdAndStatusIn(Long teamId, List<TaskGroupStatus> statuses, Pageable pageable);
 }

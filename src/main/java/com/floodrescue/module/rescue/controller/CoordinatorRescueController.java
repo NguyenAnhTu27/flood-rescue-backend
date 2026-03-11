@@ -2,6 +2,7 @@ package com.floodrescue.module.rescue.controller;
 
 import com.floodrescue.module.rescue.dto.request.*;
 import com.floodrescue.module.rescue.dto.response.CoordinatorDashboardResponse;
+import com.floodrescue.module.rescue.dto.response.BlockedCitizenResponse;
 import com.floodrescue.module.rescue.dto.response.RescueRequestResponse;
 import com.floodrescue.module.rescue.dto.response.TaskGroupResponse;
 import com.floodrescue.module.rescue.service.RescueRequestService;
@@ -20,6 +21,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/rescue/coordinator")
@@ -117,10 +120,46 @@ public class CoordinatorRescueController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/requests/{id}/citizen-block")
+    public ResponseEntity<?> blockCitizenFromRequest(
+            @PathVariable Long id,
+            @Valid @RequestBody BlockCitizenRequest request,
+            Authentication authentication
+    ) {
+        Long coordinatorId = getCurrentUserId(authentication);
+        rescueRequestService.setCitizenRequestBlockByRequest(
+                id,
+                coordinatorId,
+                Boolean.TRUE.equals(request.getBlocked()),
+                request.getReason()
+        );
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/dashboard")
     public ResponseEntity<CoordinatorDashboardResponse> getDashboard(Authentication authentication) {
         Long coordinatorId = getCurrentUserId(authentication);
         return ResponseEntity.ok(coordinatorDashboardService.getDashboard(coordinatorId));
+    }
+
+    @GetMapping("/citizens/blocked")
+    public ResponseEntity<List<BlockedCitizenResponse>> getBlockedCitizens() {
+        return ResponseEntity.ok(rescueRequestService.getBlockedCitizens());
+    }
+
+    @PostMapping("/citizens/{citizenId}/unblock")
+    public ResponseEntity<?> unblockCitizen(
+            @PathVariable Long citizenId,
+            @Valid @RequestBody(required = false) UnblockCitizenRequest request,
+            Authentication authentication
+    ) {
+        Long coordinatorId = getCurrentUserId(authentication);
+        rescueRequestService.unblockCitizen(
+                citizenId,
+                coordinatorId,
+                request == null ? null : request.getReason()
+        );
+        return ResponseEntity.ok().build();
     }
 
     // ===== Task Group APIs =====

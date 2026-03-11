@@ -1,27 +1,30 @@
 package com.floodrescue.module.team.service;
 
 import com.floodrescue.module.map.dto.TeamLocationResponse;
-import com.floodrescue.module.rescue.dto.response.RescueRequestResponse;
 import com.floodrescue.module.team.dto.request.CreateTeamRequest;
+import com.floodrescue.module.team.dto.response.TeamMemberResponse;
+import com.floodrescue.module.team.dto.response.TeamResponse;
 import com.floodrescue.module.team.entity.TeamEntity;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
 public interface TeamService {
 
-    TeamEntity createTeam(CreateTeamRequest request);
+    TeamResponse createTeam(CreateTeamRequest request);
 
-    List<TeamEntity> getAllTeams();
+    TeamResponse updateTeam(Long id, CreateTeamRequest request);
 
-    TeamEntity getTeamById(Long id);
+    void deleteTeam(Long id);
 
-    Page<RescueRequestResponse> getAssignedRescueRequests(Long teamId, Pageable pageable);
+    List<TeamResponse> getAllTeams();
+
+    TeamResponse getTeamById(Long id);
+
+    List<TeamMemberResponse> getRescuerCandidates();
 
     TeamEntity updateTeamLocation(Long teamId, Double latitude, Double longitude);
 
     List<TeamLocationResponse> getAllTeamLocations();
 
-    List<TeamLocationResponse> findNearestTeams(Double latitude, Double longitude, Double radiusKm);
+    List<TeamLocationResponse> findNearestTeams(Double lat, Double lng, Double radiusKm);
 }

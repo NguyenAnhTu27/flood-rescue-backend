@@ -9,7 +9,6 @@ import com.floodrescue.module.team.entity.TeamEntity;
 import com.floodrescue.module.team.repository.TeamRepository;
 import com.floodrescue.shared.enums.AssetStatus;
 import com.floodrescue.shared.enums.AssetType;
-import com.floodrescue.shared.enums.TeamStatus;
 import com.floodrescue.shared.exception.BusinessException;
 import com.floodrescue.shared.exception.NotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -48,7 +47,7 @@ public class AssetServiceImpl implements AssetService {
         if (request.getAssignedTeamId() != null) {
             assignedTeam = teamRepository.findById(request.getAssignedTeamId())
                     .orElseThrow(() -> new NotFoundException("Đội cứu hộ không tồn tại"));
-            if (assignedTeam.getStatus() != TeamStatus.ACTIVE) {
+            if (assignedTeam.getStatus() == null || assignedTeam.getStatus() != 1) {
                 throw new BusinessException("Không thể gán phương tiện cho đội không hoạt động");
             }
             initialStatus = AssetStatus.IN_USE;
@@ -152,7 +151,7 @@ public class AssetServiceImpl implements AssetService {
 
         TeamEntity team = teamRepository.findById(teamId)
                 .orElseThrow(() -> new NotFoundException("Đội cứu hộ không tồn tại"));
-        if (team.getStatus() != TeamStatus.ACTIVE) {
+        if (team.getStatus() == null || team.getStatus() != 1) {
             throw new BusinessException("Không thể gán phương tiện cho đội không hoạt động");
         }
 

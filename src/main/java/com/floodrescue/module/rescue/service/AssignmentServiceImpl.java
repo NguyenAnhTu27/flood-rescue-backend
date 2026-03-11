@@ -2,15 +2,18 @@ package com.floodrescue.module.rescue.service;
 
 import com.floodrescue.module.asset.entity.AssetEntity;
 import com.floodrescue.module.asset.repository.AssetRepository;
+import com.floodrescue.module.notification.service.NotificationService;
 import com.floodrescue.module.rescue.dto.request.AssignTaskGroupRequest;
 import com.floodrescue.module.rescue.dto.response.AssignmentResponse;
 import com.floodrescue.module.rescue.dto.response.TaskGroupResponse;
 import com.floodrescue.module.rescue.entity.RescueAssignmentEntity;
+import com.floodrescue.module.rescue.entity.RescueRequestEntity;
 import com.floodrescue.module.rescue.entity.TaskGroupEntity;
 import com.floodrescue.module.rescue.entity.TaskGroupRequestEntity;
 import com.floodrescue.module.rescue.entity.TaskGroupTimelineEntity;
 import com.floodrescue.module.rescue.mapper.TaskGroupMapper;
 import com.floodrescue.module.rescue.repository.RescueAssignmentRepository;
+import com.floodrescue.module.rescue.repository.RescueRequestRepository;
 import com.floodrescue.module.rescue.repository.TaskGroupRepository;
 import com.floodrescue.module.rescue.repository.TaskGroupRequestRepository;
 import com.floodrescue.module.rescue.repository.TaskGroupTimelineRepository;
@@ -19,6 +22,7 @@ import com.floodrescue.module.team.repository.TeamRepository;
 import com.floodrescue.module.user.entity.UserEntity;
 import com.floodrescue.module.user.repository.UserRepository;
 import com.floodrescue.shared.enums.AssetStatus;
+import com.floodrescue.shared.enums.RescueRequestStatus;
 import com.floodrescue.shared.enums.TaskGroupStatus;
 import com.floodrescue.shared.exception.BusinessException;
 import com.floodrescue.shared.exception.NotFoundException;
@@ -36,10 +40,12 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final TaskGroupRequestRepository taskGroupRequestRepository;
     private final TaskGroupTimelineRepository taskGroupTimelineRepository;
     private final RescueAssignmentRepository rescueAssignmentRepository;
+    private final RescueRequestRepository rescueRequestRepository;
     private final TeamRepository teamRepository;
     private final AssetRepository assetRepository;
     private final UserRepository userRepository;
     private final TaskGroupMapper mapper;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -50,13 +56,42 @@ public class AssignmentServiceImpl implements AssignmentService {
         TeamEntity team = teamRepository.findById(request.getTeamId())
                 .orElseThrow(() -> new NotFoundException("Đội cứu hộ không tồn tại"));
 
+        List<TaskGroupRequestEntity> links = taskGroupRequestRepository.findByTaskGroupId(group.getId());
+        List<RescueRequestEntity> requestEntities = links.stream()
+                .map(link -> rescueRequestRepository.findById(link.getRescueRequest().getId())
+                        .orElseThrow(() -> new NotFoundException("Yêu cầu cứu hộ không tồn tại: " + link.getRescueRequest().getId())))
+                .toList();
+        for (RescueRequestEntity rr : requestEntities) {
+            if (Boolean.TRUE.equals(rr.getIsEmergency())
+                    && rr.getSourceTeamId() != null
+                    && rr.getSourceTeamId().equals(team.getId())) {
+                throw new BusinessException("Không thể phân công lại đúng đội vừa gửi yêu cầu khẩn cấp");
+            }
+        }
+
         AssetEntity asset = null;
         if (request.getAssetId() != null) {
             asset = assetRepository.findById(request.getAssetId())
                     .orElseThrow(() -> new NotFoundException("Phương tiện / thiết bị không tồn tại"));
 
-            if (asset.getStatus() != AssetStatus.AVAILABLE) {
+            if (asset.getAssignedTeam() != null
+                    && asset.getAssignedTeam().getId() != null
+                    && !asset.getAssignedTeam().getId().equals(team.getId())) {
+                throw new BusinessException("Phương tiện đang thuộc đội khác, không thể phân cho đội này");
+            }
+
+            boolean isHeldBySameTeam = asset.getAssignedTeam() != null
+                    && asset.getAssignedTeam().getId() != null
+                    && asset.getAssignedTeam().getId().equals(team.getId());
+
+            if (!isHeldBySameTeam && asset.getStatus() != AssetStatus.AVAILABLE) {
                 throw new BusinessException("Phương tiện / thiết bị không sẵn sàng");
+            }
+
+            if (isHeldBySameTeam
+                    && asset.getStatus() != AssetStatus.AVAILABLE
+                    && asset.getStatus() != AssetStatus.IN_USE) {
+                throw new BusinessException("Phương tiện của đội hiện không khả dụng cho nhiệm vụ");
             }
         }
 
@@ -95,6 +130,7 @@ public class AssignmentServiceImpl implements AssignmentService {
             group.setStatus(TaskGroupStatus.ASSIGNED);
         }
         taskGroupRepository.save(group);
+        syncAssignedRequestStatuses(requestEntities);
 
         // Timeline
         TaskGroupTimelineEntity tl = TaskGroupTimelineEntity.builder()
@@ -105,13 +141,28 @@ public class AssignmentServiceImpl implements AssignmentService {
                 .build();
         taskGroupTimelineRepository.save(tl);
 
-        List<TaskGroupRequestEntity> links = taskGroupRequestRepository.findByTaskGroupId(group.getId());
         List<RescueAssignmentEntity> allAssignments =
                 rescueAssignmentRepository.findByTaskGroupIdAndIsActiveTrue(group.getId());
         List<TaskGroupTimelineEntity> timeline =
                 taskGroupTimelineRepository.findByTaskGroupIdOrderByCreatedAtDesc(group.getId());
 
+        for (RescueRequestEntity rr : requestEntities) {
+            if (Boolean.TRUE.equals(rr.getIsEmergency()) && rr.getId() != null && rr.getSourceTeamId() != null) {
+                notificationService.markEmergencyReassigned(coordinatorId, rr.getId(), team.getName());
+            }
+        }
+
         return mapper.toResponseWithDetails(group, links, allAssignments, timeline);
+    }
+
+    private void syncAssignedRequestStatuses(List<RescueRequestEntity> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return;
+        }
+        for (RescueRequestEntity rr : requests) {
+            rr.setStatus(RescueRequestStatus.ASSIGNED);
+        }
+        rescueRequestRepository.saveAll(requests);
     }
 
     @Override
