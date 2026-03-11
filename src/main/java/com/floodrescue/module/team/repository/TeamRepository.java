@@ -13,5 +13,5 @@ public interface TeamRepository extends JpaRepository<TeamEntity, Long> {
     boolean existsByName(String name);
     Optional<TeamEntity> findByName(String name);
 
-    List<TeamEntity> findByLatitudeIsNotNull();
+    List<TeamEntity> findByStatusAndCurrentLatitudeIsNotNull(Byte status);
 }

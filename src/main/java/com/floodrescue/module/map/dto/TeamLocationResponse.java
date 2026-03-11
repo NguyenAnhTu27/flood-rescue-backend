@@ -1,6 +1,5 @@
 package com.floodrescue.module.map.dto;
 
-import com.floodrescue.shared.enums.TeamStatus;
 import com.floodrescue.shared.enums.TeamType;
 import lombok.Builder;
 import lombok.Getter;
@@ -14,7 +13,7 @@ import java.time.LocalDateTime;
 public class TeamLocationResponse {
     private Long teamId;
     private String name;
-    private TeamStatus status;
+    private Byte status;
     private TeamType teamType;
     private Double latitude;
     private Double longitude;

@@ -23,9 +23,14 @@ public class RescueRequestCreateRequest {
     @Size(max = 255, message = "Địa chỉ không được vượt quá 255 ký tự")
     private String addressText;
 
+    @NotNull(message = "Vĩ độ không được để trống")
     private Double latitude;
 
+    @NotNull(message = "Kinh độ không được để trống")
     private Double longitude;
+
+    @Size(max = 500, message = "Mô tả vị trí không được vượt quá 500 ký tự")
+    private String locationDescription;
 
     @NotNull(message = "Mức độ ưu tiên không được để trống")
     private RescuePriority priority;

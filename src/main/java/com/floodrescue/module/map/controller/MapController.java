@@ -55,9 +55,9 @@ public class MapController {
                 .name(team.getName())
                 .status(team.getStatus())
                 .teamType(team.getTeamType())
-                .latitude(team.getLatitude())
-                .longitude(team.getLongitude())
-                .lastLocationUpdate(team.getLastLocationUpdate())
+                .latitude(team.getCurrentLatitude())
+                .longitude(team.getCurrentLongitude())
+                .lastLocationUpdate(team.getCurrentLocationUpdatedAt())
                 .build();
         return ResponseEntity.ok(response);
     }

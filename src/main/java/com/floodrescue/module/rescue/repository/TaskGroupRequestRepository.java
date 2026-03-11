@@ -10,4 +10,6 @@ public interface TaskGroupRequestRepository extends JpaRepository<TaskGroupReque
     List<TaskGroupRequestEntity> findByTaskGroupId(Long taskGroupId);
 
     List<TaskGroupRequestEntity> findByRescueRequestId(Long rescueRequestId);
+
+    void deleteByRescueRequestId(Long rescueRequestId);
 }
