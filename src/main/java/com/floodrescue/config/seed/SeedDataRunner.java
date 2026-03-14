@@ -93,6 +93,16 @@ public class SeedDataRunner implements ApplicationRunner {
     @Value("${app.seed.team2.full-name:Đội trưởng Đội Cứu hộ số 2}")
     private String team2FullName;
 
+    // Team 3 seed
+    @Value("${app.seed.team3.phone:0910000003}")
+    private String team3Phone;
+    @Value("${app.seed.team3.email:team3@gmail.com}")
+    private String team3Email;
+    @Value("${app.seed.team3.password:Team123}")
+    private String team3Password;
+    @Value("${app.seed.team3.full-name:Đội trưởng Đội Cứu hộ số 3}")
+    private String team3FullName;
+
     @Override
     public void run(ApplicationArguments args) {
         if (!seedEnabled) return;
@@ -210,15 +220,19 @@ public class SeedDataRunner implements ApplicationRunner {
      * Tự động tạo team nếu chưa có, rồi gán user vào team đó.
      */
     private void seedTeamUsers(RoleEntity rescuerRole) {
-        // Đảm bảo có ít nhất 2 team để gán user
+        // Đảm bảo có đủ các team mặc định để gán user
         TeamEntity team1 = ensureTeam("Đội Cứu hộ số 1", "Đội phản ứng nhanh khu vực trung tâm");
         TeamEntity team2 = ensureTeam("Đội Cứu hộ số 2", "Đội hỗ trợ khu vực ngoại thành");
+        TeamEntity team3 = ensureTeam("Đội Cứu hộ số 3", "Đội hỗ trợ khu vực dự phòng");
 
         // Seed user cho Team 1
         seedTeamUser(rescuerRole, team1.getId(), team1Phone, team1Email, team1Password, team1FullName);
 
         // Seed user cho Team 2
         seedTeamUser(rescuerRole, team2.getId(), team2Phone, team2Email, team2Password, team2FullName);
+
+        // Seed user cho Team 3
+        seedTeamUser(rescuerRole, team3.getId(), team3Phone, team3Email, team3Password, team3FullName);
     }
 
     /**

@@ -91,6 +91,20 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
             exec("ALTER TABLE teams MODIFY team_type ENUM('RESCUE','RELIEF','MEDICAL') NOT NULL");
             log.info("[SchemaCompatibility] Aligned teams.team_type enum");
         }
+
+        String statusType = getColumnType("teams", "status");
+        if (statusType != null && !statusType.toLowerCase().contains("tinyint")) {
+            exec("ALTER TABLE teams MODIFY status VARCHAR(20) NOT NULL");
+            exec("""
+                    UPDATE teams
+                    SET status = CASE
+                        WHEN UPPER(status) IN ('1', 'ACTIVE', 'AVAILABLE', 'TRUE') THEN '1'
+                        ELSE '0'
+                    END
+                    """);
+            exec("ALTER TABLE teams MODIFY status TINYINT(1) NOT NULL DEFAULT 1");
+            log.info("[SchemaCompatibility] Aligned teams.status to tinyint");
+        }
     }
 
     private void alignRescueRequestStatusEnums() {
@@ -173,17 +187,32 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
     }
 
     private void alignNotificationColumns() {
+        if (!columnExists("notifications", "event_code")) {
+            exec("ALTER TABLE notifications ADD COLUMN event_code VARCHAR(80) NULL");
+        }
+        if (!columnExists("notifications", "reference_type")) {
+            exec("ALTER TABLE notifications ADD COLUMN reference_type VARCHAR(50) NULL");
+        }
+        if (!columnExists("notifications", "reference_id")) {
+            exec("ALTER TABLE notifications ADD COLUMN reference_id BIGINT UNSIGNED NULL");
+        }
+        if (!columnExists("notifications", "is_urgent")) {
+            exec("ALTER TABLE notifications ADD COLUMN is_urgent TINYINT(1) NOT NULL DEFAULT 0");
+        }
+        if (!columnExists("notifications", "acknowledged_at")) {
+            exec("ALTER TABLE notifications ADD COLUMN acknowledged_at DATETIME NULL");
+        }
         if (!columnExists("notifications", "action_status")) {
-            exec("ALTER TABLE notifications ADD COLUMN action_status VARCHAR(40) NULL AFTER acknowledged_at");
+            exec("ALTER TABLE notifications ADD COLUMN action_status VARCHAR(40) NULL");
         }
         if (!columnExists("notifications", "action_note")) {
-            exec("ALTER TABLE notifications ADD COLUMN action_note TEXT NULL AFTER action_status");
+            exec("ALTER TABLE notifications ADD COLUMN action_note TEXT NULL");
         }
         if (!columnExists("notifications", "queue_request_id")) {
-            exec("ALTER TABLE notifications ADD COLUMN queue_request_id BIGINT UNSIGNED NULL AFTER action_note");
+            exec("ALTER TABLE notifications ADD COLUMN queue_request_id BIGINT UNSIGNED NULL");
         }
         if (!columnExists("notifications", "source_team_id")) {
-            exec("ALTER TABLE notifications ADD COLUMN source_team_id BIGINT UNSIGNED NULL AFTER queue_request_id");
+            exec("ALTER TABLE notifications ADD COLUMN source_team_id BIGINT UNSIGNED NULL");
         }
     }
 

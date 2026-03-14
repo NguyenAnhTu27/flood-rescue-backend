@@ -21,6 +21,10 @@ public class TeamResponse {
     private Double currentLongitude;
     private String currentLocationText;
     private LocalDateTime currentLocationUpdatedAt;
+    private Double lat;
+    private Double lng;
+    private String location;
+    private LocalDateTime lastUpdate;
     private Long leaderId;
     private String leaderName;
     private Integer memberCount;

@@ -324,13 +324,20 @@ public class RescuerTaskServiceImpl implements RescuerTaskService {
     @Transactional
     public void updateMyTeamLocation(Long rescuerUserId, Double latitude, Double longitude, String locationText) {
         Long teamId = getRequiredTeamId(rescuerUserId);
-        TeamEntity team = teamRepository.findById(teamId)
-                .orElseThrow(() -> new NotFoundException("Đội cứu hộ không tồn tại"));
-        team.setCurrentLatitude(latitude);
-        team.setCurrentLongitude(longitude);
-        team.setCurrentLocationText(locationText);
-        team.setCurrentLocationUpdatedAt(java.time.LocalDateTime.now());
-        teamRepository.save(team);
+        if (!teamRepository.existsById(teamId)) {
+            throw new NotFoundException("Đội cứu hộ không tồn tại");
+        }
+
+        int updatedRows = teamRepository.updateCurrentLocation(
+                teamId,
+                latitude,
+                longitude,
+                locationText,
+                java.time.LocalDateTime.now()
+        );
+        if (updatedRows == 0) {
+            throw new NotFoundException("Không thể cập nhật vị trí đội cứu hộ");
+        }
     }
 
     private String buildStatusChangeNote(TaskGroupStatus from, TaskGroupStatus to, String note) {
