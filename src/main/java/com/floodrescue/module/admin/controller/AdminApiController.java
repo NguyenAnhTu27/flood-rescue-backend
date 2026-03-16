@@ -1,8 +1,11 @@
 package com.floodrescue.module.admin.controller;
 
+import com.floodrescue.shared.util.StringEncryptor;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -12,7 +15,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -27,6 +29,12 @@ public class AdminApiController {
     private final JdbcTemplate jdbcTemplate;
     private final PasswordEncoder passwordEncoder;
     private final ObjectMapper objectMapper;
+    private StringEncryptor stringEncryptor;
+
+    @Value("${app.encryption.secret}")
+    public void setEncryptionSecret(String secret) {
+        this.stringEncryptor = new StringEncryptor(secret);
+    }
 
     private Long getCurrentUserId(Authentication authentication) {
         if (authentication == null || authentication.getPrincipal() == null) {
@@ -129,60 +137,54 @@ public class AdminApiController {
     ) {
         int safeSize = Math.max(1, Math.min(size, 100));
         int safePage = Math.max(0, page);
-        int offset = safePage * safeSize;
-
-        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
+        StringBuilder sql = new StringBuilder(
+                "SELECT u.id, u.full_name, u.email, u.phone, u.status, u.role_id, r.code AS role_code, u.created_at " +
+                        "FROM users u JOIN roles r ON r.id = u.role_id WHERE 1=1 "
+        );
         List<Object> params = new ArrayList<>();
 
         if (roleId != null) {
-            where.append(" AND u.role_id = ? ");
+            sql.append(" AND u.role_id = ? ");
             params.add(roleId);
         }
-        if (keyword != null && !keyword.trim().isEmpty()) {
-            where.append(" AND (u.full_name LIKE ? OR u.email LIKE ? OR u.phone LIKE ? OR CAST(u.id AS CHAR) LIKE ?) ");
-            String like = "%" + keyword.trim() + "%";
-            params.add(like);
-            params.add(like);
-            params.add(like);
-            params.add(like);
-        }
+        sql.append(" ORDER BY u.id DESC");
 
-        Long totalUsers = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM users u " + where,
-                Long.class,
-                params.toArray()
-        );
-
-        List<Object> queryParams = new ArrayList<>(params);
-        queryParams.add(safeSize);
-        queryParams.add(offset);
-
-        List<Map<String, Object>> users = jdbcTemplate.query(
-                "SELECT u.id, u.full_name, u.email, u.phone, u.status, u.role_id, r.code AS role_code, u.created_at " +
-                        "FROM users u JOIN roles r ON r.id = u.role_id " +
-                        where +
-                        " ORDER BY u.id DESC LIMIT ? OFFSET ?",
+        List<Map<String, Object>> filteredUsers = jdbcTemplate.query(
+                sql.toString(),
                 (rs, rowNum) -> {
                     Map<String, Object> item = new HashMap<>();
                     item.put("id", rs.getLong("id"));
                     item.put("fullName", rs.getString("full_name"));
-                    item.put("email", rs.getString("email"));
-                    item.put("phone", rs.getString("phone"));
+                    item.put("email", decryptUserValue(rs.getString("email")));
+                    item.put("phone", decryptUserValue(rs.getString("phone")));
                     item.put("status", rs.getInt("status") == 1 ? "ACTIVE" : "LOCKED");
                     item.put("roleId", rs.getInt("role_id"));
                     item.put("role", rs.getString("role_code"));
                     item.put("createdAt", rs.getTimestamp("created_at"));
                     return item;
                 },
-                queryParams.toArray()
+                params.toArray()
         );
 
-        int totalPages = (int) Math.ceil((totalUsers == null ? 0 : totalUsers) / (double) safeSize);
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            String normalizedKeyword = keyword.trim().toLowerCase();
+            filteredUsers = filteredUsers.stream()
+                    .filter(user -> matchesUserKeyword(user, normalizedKeyword))
+                    .toList();
+        }
+
+        int totalUsers = filteredUsers.size();
+        int offset = safePage * safeSize;
+        int fromIndex = Math.min(offset, totalUsers);
+        int toIndex = Math.min(fromIndex + safeSize, totalUsers);
+        List<Map<String, Object>> users = filteredUsers.subList(fromIndex, toIndex);
+
+        int totalPages = (int) Math.ceil(totalUsers / (double) safeSize);
         if (totalPages <= 0) totalPages = 1;
 
         Map<String, Object> response = new HashMap<>();
         response.put("users", users);
-        response.put("totalUsers", totalUsers == null ? 0 : totalUsers);
+        response.put("totalUsers", totalUsers);
         response.put("totalPages", totalPages);
         response.put("page", safePage);
         return ResponseEntity.ok(response);
@@ -195,8 +197,8 @@ public class AdminApiController {
             HttpServletRequest request
     ) {
         String fullName = String.valueOf(payload.getOrDefault("fullName", "")).trim();
-        String email = String.valueOf(payload.getOrDefault("email", "")).trim().toLowerCase();
-        String phone = String.valueOf(payload.getOrDefault("phone", "")).trim();
+        String email = normalizeEmail(payload.get("email"));
+        String phone = normalizePhone(payload.get("phone"));
         String password = String.valueOf(payload.getOrDefault("password", ""));
         Integer roleId = payload.get("roleId") == null ? null : Integer.parseInt(String.valueOf(payload.get("roleId")));
         Long teamId = payload.get("teamId") == null ? null : Long.parseLong(String.valueOf(payload.get("teamId")));
@@ -205,23 +207,24 @@ public class AdminApiController {
             return ResponseEntity.badRequest().body(Map.of("message", "Thiếu dữ liệu bắt buộc"));
         }
 
-        if (!email.isEmpty()) {
-            Integer existed = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users WHERE email = ?", Integer.class, email);
-            if (existed != null && existed > 0) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Email đã tồn tại"));
-            }
+        if (teamId != null && !teamExists(teamId)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Đội không tồn tại"));
         }
-        if (!phone.isEmpty()) {
-            Integer existed = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users WHERE phone = ?", Integer.class, phone);
-            if (existed != null && existed > 0) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Số điện thoại đã tồn tại"));
-            }
+        if (!roleExists(roleId)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Vai trò không tồn tại"));
+        }
+
+        if (email != null && userFieldExists("email", email, null)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Email đã tồn tại"));
+        }
+        if (phone != null && userFieldExists("phone", phone, null)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Số điện thoại đã tồn tại"));
         }
 
         jdbcTemplate.update(
                 "INSERT INTO users(role_id, team_id, full_name, phone, email, password_hash, status, last_login_at, created_at, updated_at, failed_login_attempts, locked_at, temp_locked_until, is_leader) " +
                         "VALUES (?, ?, ?, ?, ?, ?, 1, NULL, NOW(), NOW(), 0, NULL, NULL, b'0')",
-                roleId, teamId, fullName, phone.isEmpty() ? null : phone, email.isEmpty() ? null : email,
+                roleId, teamId, fullName, encryptUserValue(phone), encryptUserValue(email),
                 passwordEncoder.encode(password)
         );
 
@@ -238,22 +241,67 @@ public class AdminApiController {
             Authentication authentication,
             HttpServletRequest request
     ) {
-        Map<String, Object> before = jdbcTemplate.queryForMap("SELECT * FROM users WHERE id = ?", id);
+        Map<String, Object> before;
+        try {
+            before = jdbcTemplate.queryForMap("SELECT * FROM users WHERE id = ?", id);
+        } catch (EmptyResultDataAccessException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Người dùng không tồn tại"));
+        }
 
         String fullName = String.valueOf(payload.getOrDefault("fullName", before.get("full_name"))).trim();
-        String email = payload.get("email") == null ? null : String.valueOf(payload.get("email")).trim().toLowerCase();
-        String phone = payload.get("phone") == null ? null : String.valueOf(payload.get("phone")).trim();
+        boolean emailProvided = payload.containsKey("email");
+        boolean phoneProvided = payload.containsKey("phone");
+        String email = emailProvided ? normalizeEmail(payload.get("email")) : decryptUserValue(before.get("email"));
+        String phone = phoneProvided ? normalizePhone(payload.get("phone")) : decryptUserValue(before.get("phone"));
+        Long teamId = teamIdFromPayload(payload, before);
         Integer roleId = payload.get("roleId") == null ? ((Number) before.get("role_id")).intValue() : Integer.parseInt(String.valueOf(payload.get("roleId")));
         String status = String.valueOf(payload.getOrDefault("status", ((Number) before.get("status")).intValue() == 1 ? "ACTIVE" : "LOCKED"));
         int statusVal = "ACTIVE".equalsIgnoreCase(status) ? 1 : 0;
 
+        if (teamId != null && !teamExists(teamId)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Đội không tồn tại"));
+        }
+        if (!roleExists(roleId)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Vai trò không tồn tại"));
+        }
+        if (emailProvided && email != null && userFieldExists("email", email, id)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Email đã tồn tại"));
+        }
+        if (phoneProvided && phone != null && userFieldExists("phone", phone, id)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Số điện thoại đã tồn tại"));
+        }
+
         jdbcTemplate.update(
-                "UPDATE users SET full_name = ?, email = ?, phone = ?, role_id = ?, status = ?, updated_at = NOW() WHERE id = ?",
-                fullName, email, phone, roleId, statusVal, id
+                "UPDATE users SET full_name = ?, email = ?, phone = ?, team_id = ?, role_id = ?, status = ?, updated_at = NOW() WHERE id = ?",
+                fullName,
+                emailProvided ? encryptUserValue(email) : before.get("email"),
+                phoneProvided ? encryptUserValue(phone) : before.get("phone"),
+                teamId,
+                roleId,
+                statusVal,
+                id
         );
 
         Long actorId = getCurrentUserId(authentication);
-        writeAudit(actorId, "UPDATE_USER", "USER", id, "SUCCESS", "Cập nhật thông tin người dùng", email, request, before, payload);
+        Map<String, Object> updatedAuditData = new LinkedHashMap<>();
+        updatedAuditData.put("fullName", fullName);
+        updatedAuditData.put("email", email);
+        updatedAuditData.put("phone", phone);
+        updatedAuditData.put("teamId", teamId);
+        updatedAuditData.put("roleId", roleId);
+        updatedAuditData.put("status", status);
+        writeAudit(
+                actorId,
+                "UPDATE_USER",
+                "USER",
+                id,
+                "SUCCESS",
+                "Cập nhật thông tin người dùng",
+                email,
+                request,
+                toAuditUser(before),
+                updatedAuditData
+        );
         return ResponseEntity.ok(Map.of("message", "Cập nhật người dùng thành công"));
     }
 
@@ -263,10 +311,15 @@ public class AdminApiController {
             Authentication authentication,
             HttpServletRequest request
     ) {
-        Map<String, Object> before = jdbcTemplate.queryForMap("SELECT * FROM users WHERE id = ?", id);
+        Map<String, Object> before;
+        try {
+            before = jdbcTemplate.queryForMap("SELECT * FROM users WHERE id = ?", id);
+        } catch (EmptyResultDataAccessException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Người dùng không tồn tại"));
+        }
         jdbcTemplate.update("DELETE FROM users WHERE id = ?", id);
         Long actorId = getCurrentUserId(authentication);
-        writeAudit(actorId, "DELETE_USER", "USER", id, "WARN", "Xóa tài khoản", String.valueOf(before.get("email")), request, before, null);
+        writeAudit(actorId, "DELETE_USER", "USER", id, "WARN", "Xóa tài khoản", decryptUserValue(before.get("email")), request, toAuditUser(before), null);
         return ResponseEntity.ok(Map.of("message", "Đã xoá user"));
     }
 
@@ -739,5 +792,107 @@ public class AdminApiController {
     public ResponseEntity<Map<String, Object>> deleteCatalogGroup(@PathVariable String groupCode) {
         jdbcTemplate.update("DELETE FROM admin_catalogs WHERE group_code = ?", groupCode.trim().toUpperCase());
         return ResponseEntity.ok(Map.of("message", "Xóa nhóm danh mục thành công"));
+    }
+
+    private boolean matchesUserKeyword(Map<String, Object> user, String keyword) {
+        return containsKeyword(user.get("fullName"), keyword)
+                || containsKeyword(user.get("email"), keyword)
+                || containsKeyword(user.get("phone"), keyword)
+                || containsKeyword(user.get("id"), keyword);
+    }
+
+    private boolean containsKeyword(Object value, String keyword) {
+        return value != null && String.valueOf(value).toLowerCase().contains(keyword);
+    }
+
+    private String normalizeEmail(Object rawEmail) {
+        if (rawEmail == null) {
+            return null;
+        }
+        String normalized = String.valueOf(rawEmail).trim().toLowerCase();
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    private String normalizePhone(Object rawPhone) {
+        if (rawPhone == null) {
+            return null;
+        }
+        String normalized = String.valueOf(rawPhone).trim();
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    private String encryptUserValue(String value) {
+        if (value == null) {
+            return null;
+        }
+        return stringEncryptor.encrypt(value);
+    }
+
+    private String decryptUserValue(Object rawValue) {
+        if (rawValue == null) {
+            return null;
+        }
+        String value = String.valueOf(rawValue);
+        if (value.isBlank()) {
+            return null;
+        }
+        try {
+            return stringEncryptor.decrypt(value);
+        } catch (RuntimeException ex) {
+            return value;
+        }
+    }
+
+    private boolean userFieldExists(String fieldName, String plainValue, Long excludeUserId) {
+        String encryptedValue = encryptUserValue(plainValue);
+        String sql = "SELECT COUNT(*) FROM users WHERE (" + fieldName + " = ? OR " + fieldName + " = ?)";
+        List<Object> params = new ArrayList<>(List.of(encryptedValue, plainValue));
+        if (excludeUserId != null) {
+            sql += " AND id <> ?";
+            params.add(excludeUserId);
+        }
+        Integer existed = jdbcTemplate.queryForObject(sql, Integer.class, params.toArray());
+        return existed != null && existed > 0;
+    }
+
+    private boolean teamExists(Long teamId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM teams WHERE id = ?",
+                Integer.class,
+                teamId
+        );
+        return count != null && count > 0;
+    }
+
+    private boolean roleExists(Integer roleId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM roles WHERE id = ?",
+                Integer.class,
+                roleId
+        );
+        return count != null && count > 0;
+    }
+
+    private Long teamIdFromPayload(Map<String, Object> payload, Map<String, Object> before) {
+        if (!payload.containsKey("teamId")) {
+            Object existingTeamId = before.get("team_id");
+            return existingTeamId == null ? null : ((Number) existingTeamId).longValue();
+        }
+        if (payload.get("teamId") == null || String.valueOf(payload.get("teamId")).isBlank()) {
+            return null;
+        }
+        return Long.parseLong(String.valueOf(payload.get("teamId")));
+    }
+
+    private Map<String, Object> toAuditUser(Map<String, Object> rawUser) {
+        Map<String, Object> auditUser = new LinkedHashMap<>();
+        auditUser.put("id", rawUser.get("id"));
+        auditUser.put("fullName", rawUser.get("full_name"));
+        auditUser.put("email", decryptUserValue(rawUser.get("email")));
+        auditUser.put("phone", decryptUserValue(rawUser.get("phone")));
+        auditUser.put("teamId", rawUser.get("team_id"));
+        auditUser.put("roleId", rawUser.get("role_id"));
+        auditUser.put("status", ((Number) rawUser.get("status")).intValue() == 1 ? "ACTIVE" : "LOCKED");
+        return auditUser;
     }
 }
