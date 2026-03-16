@@ -3,6 +3,8 @@ package com.floodrescue.module.map.service;
 import com.floodrescue.module.map.dto.GeocodingResponse;
 import com.floodrescue.shared.exception.BusinessException;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,8 +25,11 @@ public class MapboxServiceImpl implements MapboxService {
     private static final String GEOCODING_URL = "https://api.mapbox.com/geocoding/v5/mapbox.places/{query}.json";
     private static final String REVERSE_GEOCODING_URL = "https://api.mapbox.com/geocoding/v5/mapbox.places/{lng},{lat}.json";
     private static final double EARTH_RADIUS_KM = 6371.0;
+    private static final String MAPBOX_RESILIENCE = "mapboxGeocoding";
 
     @Override
+    @Retry(name = MAPBOX_RESILIENCE, fallbackMethod = "geocodeFallback")
+    @CircuitBreaker(name = MAPBOX_RESILIENCE, fallbackMethod = "geocodeFallback")
     public GeocodingResponse geocode(String address) {
         String url = UriComponentsBuilder
                 .fromUriString(GEOCODING_URL)
@@ -53,6 +58,8 @@ public class MapboxServiceImpl implements MapboxService {
     }
 
     @Override
+    @Retry(name = MAPBOX_RESILIENCE, fallbackMethod = "reverseGeocodeFallback")
+    @CircuitBreaker(name = MAPBOX_RESILIENCE, fallbackMethod = "reverseGeocodeFallback")
     public GeocodingResponse reverseGeocode(double latitude, double longitude) {
         String url = UriComponentsBuilder
                 .fromUriString(REVERSE_GEOCODING_URL)
@@ -86,5 +93,15 @@ public class MapboxServiceImpl implements MapboxService {
                 * Math.sin(dLng / 2) * Math.sin(dLng / 2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return EARTH_RADIUS_KM * c;
+    }
+
+    private GeocodingResponse geocodeFallback(String address, Throwable throwable) {
+        log.warn("Mapbox geocode failed for address='{}': {}", address, throwable.getMessage());
+        throw new BusinessException("Dịch vụ bản đồ đang bận, vui lòng thử lại sau");
+    }
+
+    private GeocodingResponse reverseGeocodeFallback(double latitude, double longitude, Throwable throwable) {
+        log.warn("Mapbox reverse geocode failed for lat={}, lng={}: {}", latitude, longitude, throwable.getMessage());
+        throw new BusinessException("Dịch vụ bản đồ đang bận, vui lòng thử lại sau");
     }
 }

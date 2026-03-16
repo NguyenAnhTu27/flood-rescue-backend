@@ -235,14 +235,14 @@ public class ReliefRequestService {
 
     @Transactional(readOnly = true)
     public Page<ReliefRequestResponse> listMyReliefRequests(Long citizenId, Pageable pageable) {
-        return reliefRequestRepository.findByCreatedByIdOrderByCreatedAtDesc(citizenId, pageable)
-                .map(r -> toResponse(r, reliefRequestLineRepository.findByReliefRequest(r)));
+        Page<ReliefRequestEntity> page = reliefRequestRepository.findByCreatedByIdOrderByCreatedAtDesc(citizenId, pageable);
+        return mapPageWithLines(page);
     }
 
     @Transactional(readOnly = true)
     public Page<ReliefRequestResponse> listRescuerAssignedReliefRequests(Long teamId, Pageable pageable) {
-        return reliefRequestRepository.findByAssignedTeamIdOrderByUpdatedAtDesc(teamId, pageable)
-                .map(r -> toResponse(r, reliefRequestLineRepository.findByReliefRequest(r)));
+        Page<ReliefRequestEntity> page = reliefRequestRepository.findByAssignedTeamIdOrderByUpdatedAtDesc(teamId, pageable);
+        return mapPageWithLines(page);
     }
 
     @Transactional
@@ -271,6 +271,11 @@ public class ReliefRequestService {
         if (relief.getStatus() == InventoryDocumentStatus.CANCELLED) {
             throw new BusinessException("Yêu cầu cứu trợ đã bị hủy");
         }
+        if (relief.getStatus() == InventoryDocumentStatus.DONE) {
+            throw new BusinessException("Yêu cầu cứu trợ đã hoàn thành");
+        }
+
+        validateRescuerTransition(relief.getDeliveryStatus(), status);
 
         relief.setDeliveryStatus(status);
         if (note != null && !note.isBlank()) {
@@ -285,8 +290,12 @@ public class ReliefRequestService {
             issue = issueRepository.findById(relief.getAssignedIssueId())
                     .orElseThrow(() -> new NotFoundException("Không tìm thấy phiếu xuất đã gán"));
         } else {
-            issue = issueRepository.findFirstByReliefRequestIdOrderByIdDesc(relief.getId()).orElse(null);
-            if (issue != null) {
+            List<InventoryIssueEntity> issueCandidates = issueRepository.findTop2ByReliefRequest_IdOrderByIdDesc(relief.getId());
+            if (issueCandidates.size() > 1) {
+                throw new BusinessException("Yêu cầu cứu trợ đang gắn nhiều phiếu xuất, vui lòng liên hệ quản lý để đồng bộ dữ liệu");
+            }
+            if (!issueCandidates.isEmpty()) {
+                issue = issueCandidates.get(0);
                 relief.setAssignedIssueId(issue.getId());
             }
         }
@@ -326,7 +335,7 @@ public class ReliefRequestService {
         } else {
             page = reliefRequestRepository.findAll(pageable);
         }
-        return page.map(r -> toResponse(r, reliefRequestLineRepository.findByReliefRequest(r)));
+        return mapPageWithLines(page);
     }
 
     @Transactional
@@ -379,10 +388,41 @@ public class ReliefRequestService {
             relief.setNote("[TU CHOI] " + trimmedReason);
         }
         relief.setStatus(InventoryDocumentStatus.CANCELLED);
+        relief.setDeliveryStatus(ReliefDeliveryStatus.REJECTED);
+        relief.setDeliveryNote(trimmedReason);
         relief = reliefRequestRepository.save(relief);
 
         List<ReliefRequestLineEntity> lines = reliefRequestLineRepository.findByReliefRequest(relief);
         return toResponse(relief, lines);
+    }
+
+    private void validateRescuerTransition(ReliefDeliveryStatus current, ReliefDeliveryStatus next) {
+        if (next == null) {
+            throw new BusinessException("Trạng thái cập nhật không hợp lệ cho rescuer");
+        }
+
+        if (current == next) {
+            return;
+        }
+
+        // Legacy data might still be REQUESTED for assigned relief requests.
+        if (current == null || current == ReliefDeliveryStatus.REQUESTED) {
+            if (next == ReliefDeliveryStatus.RESCUER_RECEIVED) {
+                return;
+            }
+            throw new BusinessException("Chỉ có thể cập nhật sang RESCUER_RECEIVED ở bước đầu");
+        }
+
+        boolean valid =
+                (current == ReliefDeliveryStatus.MANAGER_APPROVED && next == ReliefDeliveryStatus.RESCUER_RECEIVED)
+                        || (current == ReliefDeliveryStatus.RESCUER_RECEIVED && next == ReliefDeliveryStatus.ARRIVED_WAREHOUSE)
+                        || (current == ReliefDeliveryStatus.ARRIVED_WAREHOUSE && next == ReliefDeliveryStatus.ARRIVED_RELIEF_POINT)
+                        || (current == ReliefDeliveryStatus.ARRIVED_RELIEF_POINT
+                        && (next == ReliefDeliveryStatus.COMPLETED || next == ReliefDeliveryStatus.RETURNED_TO_WAREHOUSE));
+
+        if (!valid) {
+            throw new BusinessException("Chuyển trạng thái giao hàng không hợp lệ từ " + current + " sang " + next);
+        }
     }
 
     private ReliefRequestResponse toResponse(ReliefRequestEntity relief, List<ReliefRequestLineEntity> lines) {
@@ -454,6 +494,19 @@ public class ReliefRequestService {
                 .updatedAt(relief.getUpdatedAt())
                 .lines(responseLines)
                 .build();
+    }
+
+    private Page<ReliefRequestResponse> mapPageWithLines(Page<ReliefRequestEntity> page) {
+        List<ReliefRequestEntity> reliefRequests = page.getContent();
+        if (reliefRequests.isEmpty()) {
+            return page.map(r -> toResponse(r, List.of()));
+        }
+
+        List<ReliefRequestLineEntity> allLines = reliefRequestLineRepository.findByReliefRequestIn(reliefRequests);
+        java.util.Map<Long, List<ReliefRequestLineEntity>> lineMapByReliefId = allLines.stream()
+                .collect(Collectors.groupingBy(l -> l.getReliefRequest().getId()));
+
+        return page.map(r -> toResponse(r, lineMapByReliefId.getOrDefault(r.getId(), List.of())));
     }
 
     private void notifyCitizen(ReliefRequestEntity relief, String title, String content) {

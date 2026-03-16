@@ -4,6 +4,7 @@ import com.floodrescue.module.team.dto.request.CreateTeamRequest;
 import com.floodrescue.module.team.dto.response.TeamMemberResponse;
 import com.floodrescue.module.team.dto.response.TeamResponse;
 import com.floodrescue.module.team.service.TeamService;
+import com.floodrescue.shared.dto.ApiResult;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,22 +25,22 @@ public class TeamController {
      */
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    public ResponseEntity<TeamResponse> createTeam(@Valid @RequestBody CreateTeamRequest request) {
+    public ResponseEntity<ApiResult<TeamResponse>> createTeam(@Valid @RequestBody CreateTeamRequest request) {
         TeamResponse team = teamService.createTeam(request);
-        return ResponseEntity.ok(team);
+        return ResponseEntity.ok(ApiResult.ok("Tạo đội cứu hộ thành công", team));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    public ResponseEntity<TeamResponse> updateTeam(@PathVariable Long id, @Valid @RequestBody CreateTeamRequest request) {
-        return ResponseEntity.ok(teamService.updateTeam(id, request));
+    public ResponseEntity<ApiResult<TeamResponse>> updateTeam(@PathVariable Long id, @Valid @RequestBody CreateTeamRequest request) {
+        return ResponseEntity.ok(ApiResult.ok("Cập nhật đội cứu hộ thành công", teamService.updateTeam(id, request)));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    public ResponseEntity<?> deleteTeam(@PathVariable Long id) {
+    public ResponseEntity<ApiResult<Void>> deleteTeam(@PathVariable Long id) {
         teamService.deleteTeam(id);
-        return ResponseEntity.ok().body(java.util.Map.of("message", "Xóa đội cứu hộ thành công"));
+        return ResponseEntity.ok(ApiResult.ok("Xóa đội cứu hộ thành công"));
     }
 
     /**
@@ -47,8 +48,8 @@ public class TeamController {
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','COORDINATOR')")
-    public ResponseEntity<List<TeamResponse>> getTeams() {
-        return ResponseEntity.ok(teamService.getAllTeams());
+    public ResponseEntity<ApiResult<List<TeamResponse>>> getTeams() {
+        return ResponseEntity.ok(ApiResult.ok(teamService.getAllTeams()));
     }
 
     /**
@@ -56,13 +57,13 @@ public class TeamController {
      */
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','COORDINATOR')")
-    public ResponseEntity<TeamResponse> getTeam(@PathVariable Long id) {
-        return ResponseEntity.ok(teamService.getTeamById(id));
+    public ResponseEntity<ApiResult<TeamResponse>> getTeam(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResult.ok(teamService.getTeamById(id)));
     }
 
     @GetMapping("/member-candidates")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    public ResponseEntity<List<TeamMemberResponse>> getMemberCandidates() {
-        return ResponseEntity.ok(teamService.getRescuerCandidates());
+    public ResponseEntity<ApiResult<List<TeamMemberResponse>>> getMemberCandidates() {
+        return ResponseEntity.ok(ApiResult.ok(teamService.getRescuerCandidates()));
     }
 }

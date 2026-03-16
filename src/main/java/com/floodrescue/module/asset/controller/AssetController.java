@@ -24,7 +24,7 @@ public class AssetController {
     private final AssetService assetService;
 
     @PostMapping
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public ResponseEntity<AssetResponse> createAsset(@Valid @RequestBody CreateAssetRequest request) {
         return ResponseEntity.ok(assetService.createAsset(request));
     }
@@ -36,7 +36,7 @@ public class AssetController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public ResponseEntity<AssetResponse> updateAsset(
             @PathVariable Long id,
             @Valid @RequestBody UpdateAssetRequest request) {
@@ -44,7 +44,7 @@ public class AssetController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public ResponseEntity<Void> deleteAsset(@PathVariable Long id) {
         assetService.deleteAsset(id);
         return ResponseEntity.noContent().build();

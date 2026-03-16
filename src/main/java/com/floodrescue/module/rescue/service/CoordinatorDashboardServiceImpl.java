@@ -43,7 +43,7 @@ public class CoordinatorDashboardServiceImpl implements CoordinatorDashboardServ
                         .id(r.getId())
                         .code(r.getCode())
                         .priority(r.getPriority() != null ? r.getPriority().name() : null)
-                        .peopleCount(r.getAffectedPeopleCount())
+                        .affectedPeopleCount(r.getAffectedPeopleCount())
                         .status(r.getStatus() != null ? r.getStatus().name() : null)
                         .waitingForTeam(r.getWaitingForTeam())
                         .timeAgo(formatTimeAgo(r.getCreatedAt()))

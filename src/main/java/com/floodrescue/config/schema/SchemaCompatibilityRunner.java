@@ -2,6 +2,7 @@ package com.floodrescue.config.schema;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.Ordered;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @Order(Ordered.HIGHEST_PRECEDENCE)
+@ConditionalOnProperty(value = "app.schema-compatibility.enabled", havingValue = "true", matchIfMissing = true)
 public class SchemaCompatibilityRunner implements ApplicationRunner {
 
     private final JdbcTemplate jdbcTemplate;
@@ -32,6 +34,10 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
             alignInventoryClassifications();
             alignInventoryUnits();
             alignReliefRequestWorkflow();
+            alignAuthTokenTables();
+            alignUsersEncryptedColumns();
+            alignDistributionsTable();
+            alignInventoryIssuesColumns();
             log.info("[SchemaCompatibility] Schema alignment completed");
         } catch (Exception e) {
             log.error("[SchemaCompatibility] Schema alignment failed: {}", e.getMessage(), e);
@@ -60,6 +66,25 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
             log.info("[SchemaCompatibility] Added teams.description");
         }
 
+        String statusColumnType = getColumnType("teams", "status");
+        if (statusColumnType != null &&
+                (statusColumnType.contains("ACTIVE")
+                        || statusColumnType.contains("INACTIVE")
+                        || statusColumnType.startsWith("enum("))) {
+            exec("ALTER TABLE teams MODIFY status VARCHAR(20) NULL");
+            exec("""
+                    UPDATE teams
+                    SET status = CASE
+                        WHEN status IS NULL OR TRIM(status) = '' THEN '1'
+                        WHEN UPPER(TRIM(status)) IN ('ACTIVE', '1', 'TRUE') THEN '1'
+                        WHEN UPPER(TRIM(status)) IN ('INACTIVE', '0', 'FALSE') THEN '0'
+                        ELSE '1'
+                    END
+                    """);
+            exec("ALTER TABLE teams MODIFY status TINYINT NOT NULL DEFAULT 1");
+            log.info("[SchemaCompatibility] Aligned teams.status to tinyint");
+        }
+
         String columnType = getColumnType("teams", "team_type");
         if (columnType == null) {
             return;
@@ -72,7 +97,8 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
                 || !columnType.contains("RESCUE")
                 || !columnType.contains("RELIEF")
                 || !columnType.contains("MEDICAL")) {
-            exec("ALTER TABLE teams MODIFY team_type VARCHAR(20) NOT NULL");
+            // Use a wide temporary type to avoid truncation when legacy values are longer than 20 chars.
+            exec("ALTER TABLE teams MODIFY team_type VARCHAR(100) NULL");
             exec("""
                     UPDATE teams
                     SET team_type = CASE team_type
@@ -85,8 +111,10 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
                     """);
             exec("""
                     UPDATE teams
-                    SET team_type = 'RESCUE'
-                    WHERE team_type NOT IN ('RESCUE', 'RELIEF', 'MEDICAL')
+                SET team_type = 'RESCUE'
+                WHERE team_type IS NULL
+                   OR TRIM(team_type) = ''
+                   OR UPPER(TRIM(team_type)) NOT IN ('RESCUE', 'RELIEF', 'MEDICAL')
                     """);
             exec("ALTER TABLE teams MODIFY team_type ENUM('RESCUE','RELIEF','MEDICAL') NOT NULL");
             log.info("[SchemaCompatibility] Aligned teams.team_type enum");
@@ -173,6 +201,11 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
     }
 
     private void alignNotificationColumns() {
+        if (!tableExists("notifications")) {
+            log.warn("[SchemaCompatibility] Skip notification alignment because table notifications does not exist");
+            return;
+        }
+
         if (!columnExists("notifications", "action_status")) {
             exec("ALTER TABLE notifications ADD COLUMN action_status VARCHAR(40) NULL AFTER acknowledged_at");
         }
@@ -352,6 +385,259 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
         if (!indexExists("relief_requests", "idx_relief_assigned_issue")) {
             exec("ALTER TABLE relief_requests ADD INDEX idx_relief_assigned_issue (assigned_issue_id)");
         }
+
+        // Backfill legacy rejected/cancelled requests to keep status fields consistent.
+        exec("""
+                UPDATE relief_requests
+                SET delivery_status = 'REJECTED'
+                WHERE status = 'CANCELLED'
+                  AND (delivery_status IS NULL OR delivery_status IN ('REQUESTED', 'MANAGER_APPROVED'))
+                """);
+
+        if (columnExists("relief_requests", "assigned_issue_id")
+                && tableExists("inventory_issues")
+                && !constraintExists("relief_requests", "fk_relief_assigned_issue")) {
+            try {
+                exec("ALTER TABLE relief_requests ADD CONSTRAINT fk_relief_assigned_issue FOREIGN KEY (assigned_issue_id) REFERENCES inventory_issues(id)");
+            } catch (Exception e) {
+                log.warn("[SchemaCompatibility] Skip adding fk_relief_assigned_issue: {}", e.getMessage());
+            }
+        }
+    }
+
+    private void alignAuthTokenTables() {
+        String userIdColumnType = getColumnType("users", "id");
+        String expectedUserIdType = (userIdColumnType == null || userIdColumnType.isBlank())
+                ? "BIGINT UNSIGNED"
+                : userIdColumnType.toUpperCase();
+
+        exec("""
+                CREATE TABLE IF NOT EXISTS auth_refresh_tokens (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    user_id BIGINT UNSIGNED NOT NULL,
+                    token_hash VARCHAR(128) NOT NULL,
+                    expires_at DATETIME NOT NULL,
+                    revoked TINYINT(1) NOT NULL DEFAULT 0,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    revoked_at DATETIME NULL,
+                    user_agent VARCHAR(255) NULL,
+                    ip_address VARCHAR(64) NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_auth_refresh_tokens_hash (token_hash),
+                    KEY idx_auth_refresh_tokens_user (user_id),
+                    KEY idx_auth_refresh_tokens_expires (expires_at)
+                )
+                """);
+
+        exec("""
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    user_id BIGINT UNSIGNED NOT NULL,
+                    token_hash VARCHAR(128) NOT NULL,
+                    expires_at DATETIME NOT NULL,
+                    used TINYINT(1) NOT NULL DEFAULT 0,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    used_at DATETIME NULL,
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_password_reset_tokens_hash (token_hash),
+                    KEY idx_password_reset_tokens_user (user_id),
+                    KEY idx_password_reset_tokens_expires (expires_at)
+                )
+                """);
+
+        String refreshUserIdType = getColumnType("auth_refresh_tokens", "user_id");
+        if (refreshUserIdType == null || !refreshUserIdType.equalsIgnoreCase(expectedUserIdType)) {
+            exec("ALTER TABLE auth_refresh_tokens MODIFY user_id " + expectedUserIdType + " NOT NULL");
+        }
+
+        String resetUserIdType = getColumnType("password_reset_tokens", "user_id");
+        if (resetUserIdType == null || !resetUserIdType.equalsIgnoreCase(expectedUserIdType)) {
+            exec("ALTER TABLE password_reset_tokens MODIFY user_id " + expectedUserIdType + " NOT NULL");
+        }
+
+        if (!constraintExists("auth_refresh_tokens", "fk_auth_refresh_tokens_user")) {
+            try {
+                exec("ALTER TABLE auth_refresh_tokens ADD CONSTRAINT fk_auth_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE");
+            } catch (Exception e) {
+                log.warn("[SchemaCompatibility] Skip adding fk_auth_refresh_tokens_user: {}", e.getMessage());
+            }
+        }
+
+        if (!constraintExists("password_reset_tokens", "fk_password_reset_tokens_user")) {
+            try {
+                exec("ALTER TABLE password_reset_tokens ADD CONSTRAINT fk_password_reset_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE");
+            } catch (Exception e) {
+                log.warn("[SchemaCompatibility] Skip adding fk_password_reset_tokens_user: {}", e.getMessage());
+            }
+        }
+    }
+
+    private void alignUsersEncryptedColumns() {
+        String phoneType = getColumnType("users", "phone");
+        if (phoneType != null && phoneType.toLowerCase().contains("varchar(") && !phoneType.toLowerCase().contains("varchar(500)")) {
+            exec("ALTER TABLE users MODIFY phone VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL");
+            log.info("[SchemaCompatibility] Widened users.phone to varchar(500) for encrypted storage");
+        }
+        String emailType = getColumnType("users", "email");
+        if (emailType != null && emailType.toLowerCase().contains("varchar(") && !emailType.toLowerCase().contains("varchar(512)")) {
+            exec("ALTER TABLE users MODIFY email VARCHAR(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL");
+            log.info("[SchemaCompatibility] Widened users.email to varchar(512) for encrypted storage");
+        }
+    }
+
+    private void alignDistributionsTable() {
+        // Rename assigned_team_id → team_id
+        if (columnExists("distributions", "assigned_team_id") && !columnExists("distributions", "team_id")) {
+            exec("ALTER TABLE distributions RENAME COLUMN assigned_team_id TO team_id");
+            log.info("[SchemaCompatibility] Renamed distributions.assigned_team_id to team_id");
+        } else if (!columnExists("distributions", "team_id")) {
+            exec("ALTER TABLE distributions ADD COLUMN team_id BIGINT UNSIGNED DEFAULT NULL");
+            log.info("[SchemaCompatibility] Added distributions.team_id");
+        }
+
+        // Fix code column length varchar(30) → varchar(40)
+        String codeType = getColumnType("distributions", "code");
+        if (codeType != null && codeType.toLowerCase().contains("varchar(30)")) {
+            exec("ALTER TABLE distributions MODIFY code VARCHAR(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL");
+            log.info("[SchemaCompatibility] Widened distributions.code to varchar(40)");
+        }
+
+        // Rename unique key uk_dist_code → uk_distribution_code
+        if (indexExists("distributions", "uk_dist_code") && !indexExists("distributions", "uk_distribution_code")) {
+            exec("ALTER TABLE distributions DROP INDEX uk_dist_code, ADD UNIQUE KEY uk_distribution_code (code)");
+            log.info("[SchemaCompatibility] Renamed distributions unique key to uk_distribution_code");
+        }
+
+        // Align status enum to InventoryDocumentStatus
+        String statusType = getColumnType("distributions", "status");
+        if (statusType != null && (!statusType.contains("DRAFT") || statusType.contains("PLANNED") || statusType.contains("IN_TRANSIT") || statusType.contains("DELIVERED"))) {
+            exec("ALTER TABLE distributions MODIFY status VARCHAR(20) NOT NULL DEFAULT 'DRAFT'");
+            exec("""
+                    UPDATE distributions SET status = CASE status
+                        WHEN 'PLANNED' THEN 'DRAFT'
+                        WHEN 'IN_TRANSIT' THEN 'APPROVED'
+                        WHEN 'DELIVERED' THEN 'DONE'
+                        ELSE status
+                    END
+                    WHERE status NOT IN ('DRAFT','ASSIGNED','APPROVED','DONE','CANCELLED')
+                    """);
+            exec("ALTER TABLE distributions MODIFY status ENUM('DRAFT','ASSIGNED','APPROVED','DONE','CANCELLED') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'DRAFT'");
+            log.info("[SchemaCompatibility] Aligned distributions.status enum");
+        }
+
+        // Make relief_request_id nullable (was NOT NULL in old schema)
+        try {
+            exec("ALTER TABLE distributions MODIFY relief_request_id BIGINT UNSIGNED DEFAULT NULL");
+        } catch (Exception e) {
+            log.warn("[SchemaCompatibility] Skip modifying distributions.relief_request_id: {}", e.getMessage());
+        }
+
+        // Add missing columns
+        if (!columnExists("distributions", "created_by")) {
+            exec("ALTER TABLE distributions ADD COLUMN created_by BIGINT UNSIGNED NOT NULL DEFAULT 0");
+            log.info("[SchemaCompatibility] Added distributions.created_by");
+        }
+        if (!columnExists("distributions", "issue_ref_code")) {
+            exec("ALTER TABLE distributions ADD COLUMN issue_ref_code VARCHAR(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL");
+            log.info("[SchemaCompatibility] Added distributions.issue_ref_code");
+        }
+        if (!columnExists("distributions", "asset_id")) {
+            exec("ALTER TABLE distributions ADD COLUMN asset_id BIGINT UNSIGNED DEFAULT NULL");
+            log.info("[SchemaCompatibility] Added distributions.asset_id");
+        }
+        if (!columnExists("distributions", "receiver_name")) {
+            exec("ALTER TABLE distributions ADD COLUMN receiver_name VARCHAR(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL");
+            log.info("[SchemaCompatibility] Added distributions.receiver_name");
+        }
+        if (!columnExists("distributions", "receiver_phone")) {
+            exec("ALTER TABLE distributions ADD COLUMN receiver_phone VARCHAR(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL");
+            log.info("[SchemaCompatibility] Added distributions.receiver_phone");
+        }
+        if (!columnExists("distributions", "delivery_address")) {
+            exec("ALTER TABLE distributions ADD COLUMN delivery_address VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL");
+            log.info("[SchemaCompatibility] Added distributions.delivery_address");
+        }
+        if (!columnExists("distributions", "eta")) {
+            exec("ALTER TABLE distributions ADD COLUMN eta DATETIME DEFAULT NULL");
+            log.info("[SchemaCompatibility] Added distributions.eta");
+        }
+        if (!columnExists("distributions", "priority")) {
+            exec("ALTER TABLE distributions ADD COLUMN priority VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL");
+            log.info("[SchemaCompatibility] Added distributions.priority");
+        }
+        if (!columnExists("distributions", "note")) {
+            exec("ALTER TABLE distributions ADD COLUMN note TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL");
+            log.info("[SchemaCompatibility] Added distributions.note");
+        }
+
+        // Add indexes for new FKs
+        if (columnExists("distributions", "asset_id") && !indexExists("distributions", "idx_distribution_asset")) {
+            exec("ALTER TABLE distributions ADD INDEX idx_distribution_asset (asset_id)");
+        }
+        if (columnExists("distributions", "team_id") && !indexExists("distributions", "idx_distribution_team")) {
+            exec("ALTER TABLE distributions ADD INDEX idx_distribution_team (team_id)");
+        }
+
+        // Add FK for asset_id
+        if (columnExists("distributions", "asset_id") && !constraintExists("distributions", "fk_distribution_asset")) {
+            try {
+                exec("ALTER TABLE distributions ADD CONSTRAINT fk_distribution_asset FOREIGN KEY (asset_id) REFERENCES assets (id)");
+            } catch (Exception e) {
+                log.warn("[SchemaCompatibility] Skip adding fk_distribution_asset: {}", e.getMessage());
+            }
+        }
+    }
+
+    private void alignInventoryIssuesColumns() {
+        // Add ASSIGNED to status enum
+        String statusType = getColumnType("inventory_issues", "status");
+        if (statusType != null && !statusType.contains("ASSIGNED")) {
+            exec("ALTER TABLE inventory_issues MODIFY status VARCHAR(20) NOT NULL DEFAULT 'DRAFT'");
+            exec("ALTER TABLE inventory_issues MODIFY status ENUM('DRAFT','ASSIGNED','APPROVED','DONE','CANCELLED') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'DRAFT'");
+            log.info("[SchemaCompatibility] Added ASSIGNED to inventory_issues.status enum");
+        }
+
+        // Add relief_request_id
+        if (!columnExists("inventory_issues", "relief_request_id")) {
+            exec("ALTER TABLE inventory_issues ADD COLUMN relief_request_id BIGINT UNSIGNED DEFAULT NULL");
+            exec("ALTER TABLE inventory_issues ADD INDEX idx_issue_relief (relief_request_id)");
+            if (!constraintExists("inventory_issues", "fk_issue_relief")) {
+                try {
+                    exec("ALTER TABLE inventory_issues ADD CONSTRAINT fk_issue_relief FOREIGN KEY (relief_request_id) REFERENCES relief_requests (id)");
+                } catch (Exception e) {
+                    log.warn("[SchemaCompatibility] Skip adding fk_issue_relief: {}", e.getMessage());
+                }
+            }
+            log.info("[SchemaCompatibility] Added inventory_issues.relief_request_id");
+        }
+
+        // Add assigned_team_id
+        if (!columnExists("inventory_issues", "assigned_team_id")) {
+            exec("ALTER TABLE inventory_issues ADD COLUMN assigned_team_id BIGINT UNSIGNED DEFAULT NULL");
+            exec("ALTER TABLE inventory_issues ADD INDEX idx_issue_team (assigned_team_id)");
+            if (!constraintExists("inventory_issues", "fk_issue_team")) {
+                try {
+                    exec("ALTER TABLE inventory_issues ADD CONSTRAINT fk_issue_team FOREIGN KEY (assigned_team_id) REFERENCES teams (id)");
+                } catch (Exception e) {
+                    log.warn("[SchemaCompatibility] Skip adding fk_issue_team: {}", e.getMessage());
+                }
+            }
+            log.info("[SchemaCompatibility] Added inventory_issues.assigned_team_id");
+        }
+
+        // Add asset_id
+        if (!columnExists("inventory_issues", "asset_id")) {
+            exec("ALTER TABLE inventory_issues ADD COLUMN asset_id BIGINT UNSIGNED DEFAULT NULL");
+            exec("ALTER TABLE inventory_issues ADD INDEX idx_issue_asset (asset_id)");
+            if (!constraintExists("inventory_issues", "fk_issue_asset")) {
+                try {
+                    exec("ALTER TABLE inventory_issues ADD CONSTRAINT fk_issue_asset FOREIGN KEY (asset_id) REFERENCES assets (id)");
+                } catch (Exception e) {
+                    log.warn("[SchemaCompatibility] Skip adding fk_issue_asset: {}", e.getMessage());
+                }
+            }
+            log.info("[SchemaCompatibility] Added inventory_issues.asset_id");
+        }
     }
 
     private void exec(String sql) {
@@ -370,6 +656,20 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
                 Integer.class,
                 tableName,
                 columnName
+        );
+        return count != null && count > 0;
+    }
+
+    private boolean tableExists(String tableName) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                        SELECT COUNT(*)
+                        FROM information_schema.TABLES
+                        WHERE TABLE_SCHEMA = DATABASE()
+                          AND TABLE_NAME = ?
+                        """,
+                Integer.class,
+                tableName
         );
         return count != null && count > 0;
     }

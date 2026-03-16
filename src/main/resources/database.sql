@@ -9,10 +9,6 @@
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-SET @MYSQLDUMP_TEMP_LOG_BIN = @@SESSION.SQL_LOG_BIN;
-SET @@SESSION.SQL_LOG_BIN= 0;
-SET @@GLOBAL.GTID_PURGED=/*!80000 '+'*/ '5cad4be6-0666-11f1-a663-55fcf2c60ce5:1-932,
-fa28fe58-1a32-11f1-96a9-910d8b944497:1-167';
 DROP TABLE IF EXISTS `admin_catalogs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -134,22 +130,33 @@ DROP TABLE IF EXISTS `distributions`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `distributions` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-  `code` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `relief_request_id` bigint unsigned NOT NULL,
-  `assigned_team_id` bigint unsigned NOT NULL,
-  `status` enum('PLANNED','ASSIGNED','IN_TRANSIT','DELIVERED','CANCELLED') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PLANNED',
+  `code` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` enum('DRAFT','ASSIGNED','APPROVED','DONE','CANCELLED') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'DRAFT',
+  `created_by` bigint unsigned NOT NULL,
+  `relief_request_id` bigint unsigned DEFAULT NULL,
   `issue_id` bigint unsigned DEFAULT NULL,
+  `issue_ref_code` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `team_id` bigint unsigned DEFAULT NULL,
+  `asset_id` bigint unsigned DEFAULT NULL,
+  `receiver_name` varchar(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `receiver_phone` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `delivery_address` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `eta` datetime DEFAULT NULL,
+  `priority` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `note` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_dist_code` (`code`),
-  KEY `idx_dist_status` (`status`),
-  KEY `idx_dist_team` (`assigned_team_id`),
-  KEY `idx_dist_relief` (`relief_request_id`),
-  KEY `idx_dist_issue` (`issue_id`),
-  CONSTRAINT `fk_dist_issue` FOREIGN KEY (`issue_id`) REFERENCES `inventory_issues` (`id`),
-  CONSTRAINT `fk_dist_relief` FOREIGN KEY (`relief_request_id`) REFERENCES `relief_requests` (`id`),
-  CONSTRAINT `fk_dist_team` FOREIGN KEY (`assigned_team_id`) REFERENCES `teams` (`id`)
+  UNIQUE KEY `uk_distribution_code` (`code`),
+  KEY `idx_distribution_status` (`status`),
+  KEY `idx_distribution_relief_request` (`relief_request_id`),
+  KEY `idx_distribution_issue` (`issue_id`),
+  KEY `idx_distribution_team` (`team_id`),
+  KEY `idx_distribution_asset` (`asset_id`),
+  CONSTRAINT `fk_distribution_relief_request` FOREIGN KEY (`relief_request_id`) REFERENCES `relief_requests` (`id`),
+  CONSTRAINT `fk_distribution_issue` FOREIGN KEY (`issue_id`) REFERENCES `inventory_issues` (`id`),
+  CONSTRAINT `fk_distribution_team` FOREIGN KEY (`team_id`) REFERENCES `teams` (`id`),
+  CONSTRAINT `fk_distribution_asset` FOREIGN KEY (`asset_id`) REFERENCES `assets` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `inventory_issue_lines`;
@@ -174,8 +181,11 @@ DROP TABLE IF EXISTS `inventory_issues`;
 CREATE TABLE `inventory_issues` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `code` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` enum('DRAFT','APPROVED','DONE','CANCELLED') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'DRAFT',
+  `status` enum('DRAFT','ASSIGNED','APPROVED','DONE','CANCELLED') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'DRAFT',
   `created_by` bigint unsigned NOT NULL,
+  `relief_request_id` bigint unsigned DEFAULT NULL,
+  `assigned_team_id` bigint unsigned DEFAULT NULL,
+  `asset_id` bigint unsigned DEFAULT NULL,
   `note` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -183,7 +193,13 @@ CREATE TABLE `inventory_issues` (
   UNIQUE KEY `uk_issue_code` (`code`),
   KEY `idx_issue_status` (`status`),
   KEY `idx_issue_created_by` (`created_by`),
-  CONSTRAINT `fk_issue_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`)
+  KEY `idx_issue_relief` (`relief_request_id`),
+  KEY `idx_issue_team` (`assigned_team_id`),
+  KEY `idx_issue_asset` (`asset_id`),
+  CONSTRAINT `fk_issue_user` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`),
+  CONSTRAINT `fk_issue_relief` FOREIGN KEY (`relief_request_id`) REFERENCES `relief_requests` (`id`),
+  CONSTRAINT `fk_issue_team` FOREIGN KEY (`assigned_team_id`) REFERENCES `teams` (`id`),
+  CONSTRAINT `fk_issue_asset` FOREIGN KEY (`asset_id`) REFERENCES `assets` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `inventory_receipt_lines`;
@@ -649,8 +665,8 @@ CREATE TABLE `users` (
   `role_id` int unsigned NOT NULL,
   `team_id` bigint unsigned DEFAULT NULL,
   `full_name` varchar(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-  `phone` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `email` varchar(120) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `phone` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `email` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `password_hash` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `status` tinyint NOT NULL DEFAULT '1',
   `is_leader` tinyint(1) NOT NULL DEFAULT '0',
@@ -668,8 +684,45 @@ CREATE TABLE `users` (
   CONSTRAINT `fk_users_team` FOREIGN KEY (`team_id`) REFERENCES `teams` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=34 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-SET @@SESSION.SQL_LOG_BIN = @MYSQLDUMP_TEMP_LOG_BIN;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+DROP TABLE IF EXISTS `auth_refresh_tokens`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `auth_refresh_tokens` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint unsigned NOT NULL,
+  `token_hash` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `revoked` tinyint(1) NOT NULL DEFAULT '0',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `revoked_at` datetime DEFAULT NULL,
+  `user_agent` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ip_address` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_auth_refresh_tokens_hash` (`token_hash`),
+  KEY `idx_auth_refresh_tokens_user` (`user_id`),
+  KEY `idx_auth_refresh_tokens_expires` (`expires_at`),
+  CONSTRAINT `fk_auth_refresh_tokens_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `password_reset_tokens`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `password_reset_tokens` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint unsigned NOT NULL,
+  `token_hash` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `used` tinyint(1) NOT NULL DEFAULT '0',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `used_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_password_reset_tokens_hash` (`token_hash`),
+  KEY `idx_password_reset_tokens_user` (`user_id`),
+  KEY `idx_password_reset_tokens_expires` (`expires_at`),
+  CONSTRAINT `fk_password_reset_tokens_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
 /*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;

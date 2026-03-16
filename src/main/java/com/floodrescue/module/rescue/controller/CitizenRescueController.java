@@ -8,38 +8,32 @@ import com.floodrescue.module.rescue.dto.request.RescueRequestUpdateRequest;
 import com.floodrescue.module.rescue.dto.response.AttachmentUploadResponse;
 import com.floodrescue.module.rescue.dto.response.CitizenRescueConfirmationResponse;
 import com.floodrescue.module.rescue.dto.response.RescueRequestResponse;
-import com.floodrescue.shared.enums.AttachmentFileType;
 import com.floodrescue.module.rescue.service.RescueRequestService;
+import com.floodrescue.shared.dto.ApiResult;
+import com.floodrescue.shared.dto.PagedData;
+import com.floodrescue.shared.exception.ForbiddenException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/rescue/citizen")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('CITIZEN')")
 public class CitizenRescueController {
 
     private final RescueRequestService rescueRequestService;
-
-    @Value("${app.upload.rescue-dir:uploads/rescue}")
-    private String rescueUploadDir;
 
     private Long getCurrentUserId(Authentication authentication) {
         if (authentication == null || authentication.getPrincipal() == null) {
@@ -50,60 +44,66 @@ public class CitizenRescueController {
     }
 
     @PostMapping("/requests")
-    public ResponseEntity<RescueRequestResponse> createRescueRequest(
+    public ResponseEntity<ApiResult<RescueRequestResponse>> createRescueRequest(
             @Valid @RequestBody RescueRequestCreateRequest request,
             Authentication authentication) {
         Long citizenId = getCurrentUserId(authentication);
         RescueRequestResponse response = rescueRequestService.createRescueRequest(citizenId, request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResult.ok("Tạo yêu cầu cứu hộ thành công", response));
     }
 
     @GetMapping("/requests")
-    public ResponseEntity<Page<RescueRequestResponse>> getMyRescueRequests(
+    public ResponseEntity<ApiResult<PagedData<RescueRequestResponse>>> getMyRescueRequests(
             @PageableDefault(size = 20) Pageable pageable,
             Authentication authentication) {
         Long citizenId = getCurrentUserId(authentication);
         Page<RescueRequestResponse> response = rescueRequestService.getRescueRequestsByCitizen(citizenId, pageable);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResult.ok(PagedData.from(response)));
     }
 
     @GetMapping("/requests/{id}")
-    public ResponseEntity<RescueRequestResponse> getRescueRequestById(@PathVariable Long id) {
+    public ResponseEntity<ApiResult<RescueRequestResponse>> getRescueRequestById(
+            @PathVariable Long id,
+            Authentication authentication) {
+        Long citizenId = getCurrentUserId(authentication);
         RescueRequestResponse response = rescueRequestService.getRescueRequestById(id);
-        return ResponseEntity.ok(response);
+        if (!response.getCitizenId().equals(citizenId)) {
+            throw new ForbiddenException("Bạn không có quyền xem yêu cầu cứu hộ này");
+        }
+        return ResponseEntity.ok(ApiResult.ok(response));
     }
 
     @PutMapping("/requests/{id}")
-    public ResponseEntity<RescueRequestResponse> updateRescueRequest(
+    public ResponseEntity<ApiResult<RescueRequestResponse>> updateRescueRequest(
             @PathVariable Long id,
             @Valid @RequestBody RescueRequestUpdateRequest request,
             Authentication authentication) {
         Long citizenId = getCurrentUserId(authentication);
         RescueRequestResponse response = rescueRequestService.updateRescueRequest(id, citizenId, request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResult.ok("Cập nhật yêu cầu cứu hộ thành công", response));
     }
 
     @DeleteMapping("/requests/{id}")
-    public ResponseEntity<Map<String, String>> cancelRescueRequest(
+    public ResponseEntity<ApiResult<Void>> cancelRescueRequest(
             @PathVariable Long id,
             Authentication authentication) {
         Long citizenId = getCurrentUserId(authentication);
         rescueRequestService.cancelRescueRequest(id, citizenId);
-        return ResponseEntity.ok(Map.of("message", "Yêu cầu cứu hộ đã được hủy"));
+        return ResponseEntity.ok(ApiResult.ok("Yêu cầu cứu hộ đã được hủy"));
     }
 
     @PostMapping("/requests/{id}/notes")
-    public ResponseEntity<RescueRequestResponse> addNote(
+    public ResponseEntity<ApiResult<RescueRequestResponse>> addNote(
             @PathVariable Long id,
             @Valid @RequestBody AddNoteRequest request,
             Authentication authentication) {
         Long userId = getCurrentUserId(authentication);
         RescueRequestResponse response = rescueRequestService.addNote(id, userId, request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResult.ok("Thêm ghi chú thành công", response));
     }
 
     @PostMapping("/requests/{id}/confirm-result")
-    public ResponseEntity<CitizenRescueConfirmationResponse> confirmRescueResult(
+    public ResponseEntity<ApiResult<CitizenRescueConfirmationResponse>> confirmRescueResult(
             @PathVariable Long id,
             @Valid @RequestBody ConfirmRescueResultRequest request,
             Authentication authentication
@@ -115,66 +115,23 @@ public class CitizenRescueController {
                 request.getRescued(),
                 request.getReason()
         );
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResult.ok(response));
     }
 
     @PostMapping("/requests/{id}/reopen")
-    public ResponseEntity<RescueRequestResponse> reopenCancelledRequest(
+    public ResponseEntity<ApiResult<RescueRequestResponse>> reopenCancelledRequest(
             @PathVariable Long id,
             @Valid @RequestBody ReopenCancelledRequest request,
             Authentication authentication
     ) {
         Long citizenId = getCurrentUserId(authentication);
-        return ResponseEntity.ok(rescueRequestService.reopenCancelledRequest(id, citizenId, request.getReason()));
+        return ResponseEntity.ok(ApiResult.ok("Mở lại yêu cầu thành công", rescueRequestService.reopenCancelledRequest(id, citizenId, request.getReason())));
     }
 
-    /**
-     * Upload one or more image files for rescue request attachments.
-     * Returns list of fileUrl + fileType to be sent back in RescueRequestCreateRequest.attachments.
-     */
     @PostMapping("/attachments")
-    public ResponseEntity<List<AttachmentUploadResponse>> uploadAttachments(
+    public ResponseEntity<ApiResult<List<AttachmentUploadResponse>>> uploadAttachments(
             @RequestParam("files") List<MultipartFile> files
     ) throws IOException {
-        if (files == null || files.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        Path uploadPath = Paths.get(rescueUploadDir).toAbsolutePath().normalize();
-        if (!Files.exists(uploadPath)) {
-            Files.createDirectories(uploadPath);
-        }
-
-        List<AttachmentUploadResponse> result = new ArrayList<>();
-
-        for (MultipartFile file : files) {
-            if (file.isEmpty()) continue;
-
-            String originalName = file.getOriginalFilename();
-            String ext = "";
-            if (originalName != null && originalName.contains(".")) {
-                ext = originalName.substring(originalName.lastIndexOf("."));
-            }
-
-            String newFileName = UUID.randomUUID() + ext;
-            Path target = uploadPath.resolve(newFileName);
-
-            // Use Path-based transfer to avoid Tomcat writing into its temp dir
-            // and to ensure parent directories are respected
-            file.transferTo(target);
-
-            // File will be accessible via /uploads/rescue/{newFileName}
-            // Ensure fileUrl starts with / and uses forward slashes
-            String fileUrl = "/uploads/rescue/" + newFileName;
-            // Normalize to ensure consistent format (remove any double slashes, etc.)
-            fileUrl = fileUrl.replaceAll("/+", "/");
-
-            result.add(AttachmentUploadResponse.builder()
-                    .fileUrl(fileUrl)
-                    .fileType(AttachmentFileType.IMAGE)
-                    .build());
-        }
-
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(ApiResult.ok("Tải file lên thành công", rescueRequestService.uploadAttachments(files)));
     }
 }

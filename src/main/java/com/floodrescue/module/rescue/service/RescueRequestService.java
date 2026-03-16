@@ -23,6 +23,8 @@ public interface RescueRequestService {
 
     Page<RescueRequestResponse> getRescueRequestsByStatus(RescueRequestStatus status, Pageable pageable);
 
+    List<com.floodrescue.module.map.dto.RescueLocationResponse> getRescueLocationResponses();
+
     Page<RescueRequestResponse> searchRescueRequests(RescueRequestStatus status, RescuePriority priority, String keyword, Pageable pageable);
 
     Page<RescueRequestResponse> getPendingRescueRequests(Pageable pageable);
@@ -50,4 +52,6 @@ public interface RescueRequestService {
     void unblockCitizen(Long citizenId, Long coordinatorId, String reason);
 
     RescueRequestResponse reopenCancelledRequest(Long requestId, Long citizenId, String reason);
+
+    List<com.floodrescue.module.rescue.dto.response.AttachmentUploadResponse> uploadAttachments(List<org.springframework.web.multipart.MultipartFile> files) throws java.io.IOException;
 }

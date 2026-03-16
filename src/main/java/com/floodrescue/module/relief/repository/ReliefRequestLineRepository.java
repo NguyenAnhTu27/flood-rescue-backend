@@ -9,4 +9,6 @@ import java.util.List;
 public interface ReliefRequestLineRepository extends JpaRepository<ReliefRequestLineEntity, Long> {
 
     List<ReliefRequestLineEntity> findByReliefRequest(ReliefRequestEntity reliefRequest);
+
+    List<ReliefRequestLineEntity> findByReliefRequestIn(List<ReliefRequestEntity> reliefRequests);
 }

@@ -22,7 +22,7 @@ public class CoordinatorDashboardResponse {
         private Long id;
         private String code;
         private String priority;     // HIGH/MEDIUM/LOW
-        private Integer peopleCount; // affectedPeopleCount
+        private Integer affectedPeopleCount;
         private String timeAgo;      // "1p trước"
         private String status;       // PENDING/VERIFIED/...
         private Boolean waitingForTeam;

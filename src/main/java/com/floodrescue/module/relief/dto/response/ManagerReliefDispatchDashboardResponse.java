@@ -22,7 +22,7 @@ public class ManagerReliefDispatchDashboardResponse {
         private Long id;
         private String code;
         private String priority;
-        private Integer peopleCount;
+        private Integer affectedPeopleCount;
         private String timeAgo;
         private String status;
         private Boolean waitingForTeam;

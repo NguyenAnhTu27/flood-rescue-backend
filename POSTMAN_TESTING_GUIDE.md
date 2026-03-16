@@ -6,6 +6,8 @@
 - **Authentication**: JWT Bearer Token (required for all rescue endpoints)
 - **Content-Type**: `application/json`
 
+**Response format:** Success responses are wrapped in `ApiResult`: `{ "success": true, "message": null, "data": { ... } }`. Use the `data` object for the actual payload. Error responses: `{ "success": false, "message": "...", "data": null }` or validation errors with field map in `data`.
+
 ---
 
 ## Step 1: Authentication (Get JWT Token)
@@ -32,9 +34,15 @@ Content-Type: application/json
 **Response:**
 ```json
 {
-  "message": "Đăng ký Citizen thành công"
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "tokenType": "Bearer",
+  "userId": 1,
+  "fullName": "Nguyễn Văn A",
+  "role": "CITIZEN"
 }
 ```
+
+**Lưu ý**: Bạn có thể dùng luôn token trả từ bước đăng ký, không bắt buộc gọi login lại.
 
 ### 1.2 Login to Get JWT Token
 
@@ -64,7 +72,31 @@ Content-Type: application/json
 }
 ```
 
-**⚠️ IMPORTANT**: Copy the `token` value from the response. You'll need it for all rescue endpoints.
+**⚠️ IMPORTANT**: Copy the `token` value from the response (from `data` if wrapped in ApiResult). You'll need it for all rescue endpoints.
+
+### 1.3 Forgot Password (optional)
+
+**POST** `http://localhost:8080/api/auth/forgot-password`
+
+**Body (JSON):**
+```json
+{
+  "identifier": "0912345678"
+}
+```
+(`identifier` = email or phone of the account.)
+
+### 1.4 Reset Password (optional)
+
+**POST** `http://localhost:8080/api/auth/reset-password`
+
+**Body (JSON):**
+```json
+{
+  "token": "reset-token-from-email",
+  "newPassword": "Password123"
+}
+```
 
 ---
 
@@ -260,7 +292,7 @@ Authorization: Bearer {{token}}
 
 ## Step 4: Coordinator Rescue Endpoints
 
-**Note**: You need to login with a COORDINATOR account. If you don't have one, you may need to create it in the database or through an admin endpoint.
+**Note**: You need to login with a COORDINATOR (or ADMIN) account. The backend enforces `@PreAuthorize("hasAnyRole('COORDINATOR','ADMIN')")` on these endpoints; otherwise you get 403 Forbidden.
 
 ### 4.1 Get All Rescue Requests (with filters)
 
@@ -385,7 +417,7 @@ Authorization: Bearer {{token}}
 
 ## Step 5: Rescuer Task Endpoints
 
-**Note**: You need to login with a RESCUER account.
+**Note**: You need to login with a RESCUER (or ADMIN) account. The backend enforces `@PreAuthorize("hasAnyRole('RESCUER','ADMIN')")` on these endpoints; otherwise you get 403 Forbidden.
 
 ### 5.1 Get My Tasks
 

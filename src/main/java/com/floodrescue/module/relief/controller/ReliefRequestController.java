@@ -10,7 +10,9 @@ import com.floodrescue.module.relief.dto.response.ReliefRequestResponse;
 import com.floodrescue.module.relief.service.ManagerReliefDashboardService;
 import com.floodrescue.module.relief.service.ManagerReliefDispatchDashboardService;
 import com.floodrescue.module.relief.service.ReliefRequestService;
-import com.floodrescue.module.user.repository.UserRepository;
+import com.floodrescue.module.user.service.UserService;
+import com.floodrescue.shared.dto.ApiResult;
+import com.floodrescue.shared.dto.PagedData;
 import com.floodrescue.shared.enums.InventoryDocumentStatus;
 import com.floodrescue.shared.util.CodeGenerator;
 import jakarta.validation.Valid;
@@ -34,7 +36,7 @@ public class ReliefRequestController {
     private final ManagerReliefDashboardService dashboardService;
     private final ManagerReliefDispatchDashboardService dispatchDashboardService;
     private final ReliefRequestService reliefRequestService;
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     private Long getCurrentUserId(Authentication authentication) {
         if (authentication == null || authentication.getPrincipal() == null) {
@@ -50,14 +52,14 @@ public class ReliefRequestController {
      */
     @GetMapping("/dashboard")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    public ResponseEntity<ManagerReliefDashboardResponse> getManagerDashboard() {
-        return ResponseEntity.ok(dashboardService.getDashboard());
+    public ResponseEntity<ApiResult<ManagerReliefDashboardResponse>> getManagerDashboard() {
+        return ResponseEntity.ok(ApiResult.ok(dashboardService.getDashboard()));
     }
 
     @GetMapping("/dispatch-dashboard")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    public ResponseEntity<ManagerReliefDispatchDashboardResponse> getManagerDispatchDashboard() {
-        return ResponseEntity.ok(dispatchDashboardService.getDashboard());
+    public ResponseEntity<ApiResult<ManagerReliefDispatchDashboardResponse>> getManagerDispatchDashboard() {
+        return ResponseEntity.ok(ApiResult.ok(dispatchDashboardService.getDashboard()));
     }
 
     /**
@@ -66,12 +68,12 @@ public class ReliefRequestController {
      */
     @PostMapping("/requests")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CITIZEN')")
-    public ResponseEntity<ReliefRequestResponse> createReliefRequest(
+    public ResponseEntity<ApiResult<ReliefRequestResponse>> createReliefRequest(
             @Valid @RequestBody ReliefRequestCreateRequest request,
             Authentication authentication
     ) {
         Long userId = getCurrentUserId(authentication);
-        return ResponseEntity.ok(reliefRequestService.createReliefRequest(userId, request));
+        return ResponseEntity.ok(ApiResult.ok("Tạo yêu cầu cứu trợ thành công", reliefRequestService.createReliefRequest(userId, request)));
     }
 
     /**
@@ -79,8 +81,8 @@ public class ReliefRequestController {
      */
     @GetMapping("/requests/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CITIZEN','RESCUER')")
-    public ResponseEntity<ReliefRequestResponse> getReliefRequest(@PathVariable Long id) {
-        return ResponseEntity.ok(reliefRequestService.getReliefRequest(id));
+    public ResponseEntity<ApiResult<ReliefRequestResponse>> getReliefRequest(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResult.ok(reliefRequestService.getReliefRequest(id)));
     }
 
     /**
@@ -88,11 +90,11 @@ public class ReliefRequestController {
      */
     @GetMapping("/requests")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    public ResponseEntity<Page<ReliefRequestResponse>> listReliefRequests(
+    public ResponseEntity<ApiResult<PagedData<ReliefRequestResponse>>> listReliefRequests(
             @RequestParam(required = false) InventoryDocumentStatus status,
             @PageableDefault(size = 20) Pageable pageable
     ) {
-        return ResponseEntity.ok(reliefRequestService.listReliefRequests(status, pageable));
+        return ResponseEntity.ok(ApiResult.ok(PagedData.from(reliefRequestService.listReliefRequests(status, pageable))));
     }
 
     /**
@@ -100,62 +102,62 @@ public class ReliefRequestController {
      */
     @PutMapping("/requests/{id}/approve")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    public ResponseEntity<ReliefRequestResponse> approveReliefRequest(
+    public ResponseEntity<ApiResult<ReliefRequestResponse>> approveReliefRequest(
             @PathVariable Long id,
             Authentication authentication
     ) {
         Long userId = getCurrentUserId(authentication);
-        return ResponseEntity.ok(reliefRequestService.approveReliefRequest(id, userId));
+        return ResponseEntity.ok(ApiResult.ok("Duyệt yêu cầu thành công", reliefRequestService.approveReliefRequest(id, userId)));
     }
 
     @GetMapping("/requests/generate-code")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CITIZEN')")
-    public ResponseEntity<Map<String, String>> generateReliefRequestCode() {
-        return ResponseEntity.ok(Map.of("code", CodeGenerator.generateInventoryReceiptCode()));
+    public ResponseEntity<ApiResult<Map<String, String>>> generateReliefRequestCode() {
+        return ResponseEntity.ok(ApiResult.ok(Map.of("code", CodeGenerator.generateInventoryReceiptCode())));
     }
 
     @GetMapping("/citizen/requests")
     @PreAuthorize("hasRole('CITIZEN')")
-    public ResponseEntity<Page<ReliefRequestResponse>> listMyReliefRequests(
+    public ResponseEntity<ApiResult<PagedData<ReliefRequestResponse>>> listMyReliefRequests(
             @PageableDefault(size = 20) Pageable pageable,
             Authentication authentication
     ) {
         Long userId = getCurrentUserId(authentication);
-        return ResponseEntity.ok(reliefRequestService.listMyReliefRequests(userId, pageable));
+        return ResponseEntity.ok(ApiResult.ok(PagedData.from(reliefRequestService.listMyReliefRequests(userId, pageable))));
     }
 
     @PutMapping("/citizen/requests/{id}")
     @PreAuthorize("hasRole('CITIZEN')")
-    public ResponseEntity<ReliefRequestResponse> updateCitizenReliefRequest(
+    public ResponseEntity<ApiResult<ReliefRequestResponse>> updateCitizenReliefRequest(
             @PathVariable Long id,
             @Valid @RequestBody ReliefRequestCreateRequest request,
             Authentication authentication
     ) {
         Long userId = getCurrentUserId(authentication);
-        return ResponseEntity.ok(reliefRequestService.updateCitizenReliefRequest(id, userId, request));
+        return ResponseEntity.ok(ApiResult.ok("Cập nhật yêu cầu thành công", reliefRequestService.updateCitizenReliefRequest(id, userId, request)));
     }
 
     @DeleteMapping("/citizen/requests/{id}")
     @PreAuthorize("hasRole('CITIZEN')")
-    public ResponseEntity<?> cancelCitizenReliefRequest(
+    public ResponseEntity<ApiResult<Void>> cancelCitizenReliefRequest(
             @PathVariable Long id,
             @RequestParam(required = false) String reason,
             Authentication authentication
     ) {
         Long userId = getCurrentUserId(authentication);
         reliefRequestService.cancelCitizenReliefRequest(id, userId, reason);
-        return ResponseEntity.ok(Map.of("message", "Yêu cầu cứu trợ đã được hủy"));
+        return ResponseEntity.ok(ApiResult.ok("Yêu cầu cứu trợ đã được hủy"));
     }
 
     @PutMapping("/requests/{id}/approve-dispatch")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    public ResponseEntity<ReliefRequestResponse> approveAndDispatch(
+    public ResponseEntity<ApiResult<ReliefRequestResponse>> approveAndDispatch(
             @PathVariable Long id,
             @Valid @RequestBody ReliefApproveDispatchRequest request,
             Authentication authentication
     ) {
         Long managerId = getCurrentUserId(authentication);
-        return ResponseEntity.ok(reliefRequestService.approveAndDispatch(id, managerId, request.getAssignedTeamId(), request.getNote()));
+        return ResponseEntity.ok(ApiResult.ok("Duyệt và điều phối thành công", reliefRequestService.approveAndDispatch(id, managerId, request.getAssignedTeamId(), request.getNote())));
     }
 
     /**
@@ -163,45 +165,41 @@ public class ReliefRequestController {
      */
     @PutMapping("/requests/{id}/reject")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    public ResponseEntity<ReliefRequestResponse> rejectReliefRequest(
+    public ResponseEntity<ApiResult<ReliefRequestResponse>> rejectReliefRequest(
             @PathVariable Long id,
             @Valid @RequestBody ReliefRequestRejectRequest request,
             Authentication authentication
     ) {
         Long userId = getCurrentUserId(authentication);
-        return ResponseEntity.ok(reliefRequestService.rejectReliefRequest(id, userId, request.getReason()));
+        return ResponseEntity.ok(ApiResult.ok("Đã từ chối yêu cầu", reliefRequestService.rejectReliefRequest(id, userId, request.getReason())));
     }
 
     @GetMapping("/rescuer/requests")
     @PreAuthorize("hasRole('RESCUER')")
-    public ResponseEntity<Page<ReliefRequestResponse>> listRescuerReliefRequests(
+    public ResponseEntity<ApiResult<PagedData<ReliefRequestResponse>>> listRescuerReliefRequests(
             @PageableDefault(size = 20) Pageable pageable,
             Authentication authentication
     ) {
-        Long userId = getCurrentUserId(authentication);
         Long teamId = getCurrentUserTeamId(authentication);
         if (teamId == null) {
-            return ResponseEntity.ok(Page.empty(pageable));
+            return ResponseEntity.ok(ApiResult.ok(PagedData.from(Page.empty(pageable))));
         }
-        return ResponseEntity.ok(reliefRequestService.listRescuerAssignedReliefRequests(teamId, pageable));
+        return ResponseEntity.ok(ApiResult.ok(PagedData.from(reliefRequestService.listRescuerAssignedReliefRequests(teamId, pageable))));
     }
 
     @PutMapping("/rescuer/requests/{id}/delivery-status")
     @PreAuthorize("hasRole('RESCUER')")
-    public ResponseEntity<ReliefRequestResponse> updateRescuerDeliveryStatus(
+    public ResponseEntity<ApiResult<ReliefRequestResponse>> updateRescuerDeliveryStatus(
             @PathVariable Long id,
             @Valid @RequestBody ReliefRescuerStatusUpdateRequest request,
             Authentication authentication
     ) {
         Long userId = getCurrentUserId(authentication);
-        return ResponseEntity.ok(reliefRequestService.updateRescuerDeliveryStatus(userId, id, request.getStatus(), request.getNote()));
+        return ResponseEntity.ok(ApiResult.ok("Cập nhật trạng thái giao hàng thành công", reliefRequestService.updateRescuerDeliveryStatus(userId, id, request.getStatus(), request.getNote())));
     }
 
     private Long getCurrentUserTeamId(Authentication authentication) {
         Long userId = getCurrentUserId(authentication);
-        if (userId == null) {
-            return null;
-        }
-        return userRepository.findById(userId).map(u -> u.getTeamId()).orElse(null);
+        return userService.getUserTeamId(userId);
     }
 }

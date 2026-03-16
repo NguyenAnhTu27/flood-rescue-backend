@@ -1,4 +1,5 @@
 package com.floodrescue.module.user.service;
 
-public class UserService {
+public interface UserService {
+    Long getUserTeamId(Long userId);
 }

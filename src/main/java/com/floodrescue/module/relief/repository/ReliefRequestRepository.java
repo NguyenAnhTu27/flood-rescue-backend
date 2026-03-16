@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ReliefRequestRepository extends JpaRepository<ReliefRequestEntity, Long> {
 
+    boolean existsByCode(String code);
+
     Page<ReliefRequestEntity> findByStatus(InventoryDocumentStatus status, Pageable pageable);
 
     Page<ReliefRequestEntity> findByCreatedByIdOrderByCreatedAtDesc(Long createdById, Pageable pageable);

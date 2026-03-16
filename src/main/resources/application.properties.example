@@ -1,0 +1,97 @@
+# ===============================
+# SERVER
+# ===============================
+server.port=8080
+
+# ===============================
+# DATASOURCE (MySQL)
+# ===============================
+spring.datasource.url=jdbc:mysql://localhost:3306/flood_rescue?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+spring.datasource.username=root
+spring.datasource.password=CHANGE_ME
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+
+# ===============================
+# JPA / HIBERNATE
+# ===============================
+spring.jpa.hibernate.ddl-auto=none
+# Disable in production to avoid leaking SQL in logs
+spring.jpa.show-sql=false
+spring.jpa.database-platform=org.hibernate.dialect.MySQLDialect
+spring.jpa.properties.hibernate.format_sql=false
+
+# ===============================
+# CONNECTION POOL (Hikari)
+# ===============================
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=5
+spring.datasource.hikari.idle-timeout=30000
+spring.datasource.hikari.max-lifetime=1800000
+spring.datasource.hikari.connection-timeout=30000
+
+# ===============================
+# JWT — Use a cryptographically random 256-bit secret
+# Generate: openssl rand -hex 32
+# ===============================
+app.jwt.secret=CHANGE_ME_USE_OPENSSL_RAND_HEX_32
+app.jwt.expiration-ms=86400000
+
+# Login rate limit (anti brute-force)
+app.auth.login-rate-limit.max-attempts=5
+app.auth.login-rate-limit.window-seconds=900
+app.auth.login-rate-limit.block-seconds=900
+app.auth.login-rate-limit.max-tracked-keys=10000
+
+# ===============================
+# SEED DATA
+# Set to false in production!
+# ===============================
+app.seed.enabled=false
+app.seed.coordinator.email=CHANGE_ME@example.com
+app.seed.coordinator.phone=CHANGE_ME
+app.seed.coordinator.password=CHANGE_ME
+app.seed.coordinator.full-name=CHANGE_ME
+
+app.seed.admin.email=CHANGE_ME@example.com
+app.seed.admin.phone=CHANGE_ME
+app.seed.admin.password=CHANGE_ME
+app.seed.admin.full-name=CHANGE_ME
+
+app.seed.manager.email=CHANGE_ME@example.com
+app.seed.manager.phone=CHANGE_ME
+app.seed.manager.password=CHANGE_ME
+app.seed.manager.full-name=CHANGE_ME
+
+app.seed.team1.phone=CHANGE_ME
+app.seed.team1.email=CHANGE_ME@example.com
+app.seed.team1.password=CHANGE_ME
+app.seed.team1.full-name=CHANGE_ME
+
+app.seed.team2.phone=CHANGE_ME
+app.seed.team2.email=CHANGE_ME@example.com
+app.seed.team2.password=CHANGE_ME
+app.seed.team2.full-name=CHANGE_ME
+
+# ===============================
+# UPLOAD
+# ===============================
+app.upload.rescue-dir=uploads/rescue
+spring.web.resources.static-locations=classpath:/static/,file:uploads/
+spring.servlet.multipart.max-file-size=20MB
+spring.servlet.multipart.max-request-size=20MB
+
+# ===============================
+# ENCRYPTION (for email & phone fields)
+# Generate: openssl rand -hex 16
+# ===============================
+app.encryption.secret=CHANGE_ME_USE_OPENSSL_RAND_HEX_16
+
+# ===============================
+# MAPBOX
+# ===============================
+mapbox.access-token=${MAPBOX_ACCESS_TOKEN:CHANGE_ME}
+
+# ===============================
+# CORS — comma-separated allowed origins
+# ===============================
+app.cors.allowed-origins=http://localhost:5173

@@ -26,6 +26,8 @@ import com.floodrescue.shared.enums.TaskGroupStatus;
 import com.floodrescue.shared.enums.TimelineEventType;
 import com.floodrescue.shared.exception.BusinessException;
 import com.floodrescue.shared.exception.NotFoundException;
+import com.floodrescue.shared.storage.FileStorageService;
+import com.floodrescue.shared.storage.StoredFile;
 import com.floodrescue.shared.util.CodeGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -56,6 +58,18 @@ public class RescueRequestServiceImpl implements RescueRequestService {
     private final NotificationService notificationService;
     private final NotificationRepository notificationRepository;
     private final TaskGroupRequestRepository taskGroupRequestRepository;
+    private final FileStorageService fileStorageService;
+
+    private static final int MAX_UPLOAD_FILES = 10;
+    private static final java.util.Set<String> ALLOWED_MIME_TYPES = java.util.Set.of(
+            "image/jpeg", "image/png", "image/gif", "image/webp"
+    );
+    private static final Map<String, String> MIME_TO_EXT = Map.of(
+            "image/jpeg", ".jpg",
+            "image/png",  ".png",
+            "image/gif",  ".gif",
+            "image/webp", ".webp"
+    );
 
     @Override
     @Transactional
@@ -63,6 +77,11 @@ public class RescueRequestServiceImpl implements RescueRequestService {
         UserEntity citizen = userRepository.findById(citizenId)
                 .orElseThrow(() -> new NotFoundException("Người dùng không tồn tại"));
         validateCitizenCanCreateRequest(citizen);
+
+        if ((request.getLatitude() == null || request.getLongitude() == null)
+                && (request.getAddressText() == null || request.getAddressText().isBlank())) {
+            throw new BusinessException("Phải cung cấp tọa độ (vĩ/kinh độ) hoặc địa chỉ");
+        }
 
         String code = generateUniqueRescueRequestCode();
 
@@ -122,6 +141,27 @@ public class RescueRequestServiceImpl implements RescueRequestService {
         );
 
         return enrichEmergencyActionStatus(mapper.toResponse(savedEntity));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<com.floodrescue.module.map.dto.RescueLocationResponse> getRescueLocationResponses() {
+        List<RescueRequestEntity> requests = rescueRequestRepository
+                .findByStatusAndLatitudeIsNotNull(RescueRequestStatus.PENDING);
+
+        return requests.stream()
+                .map(r -> com.floodrescue.module.map.dto.RescueLocationResponse.builder()
+                        .id(r.getId())
+                        .code(r.getCode())
+                        .status(r.getStatus())
+                        .priority(r.getPriority())
+                        .latitude(r.getLatitude())
+                        .longitude(r.getLongitude())
+                        .addressText(r.getAddressText())
+                        .affectedPeopleCount(r.getAffectedPeopleCount())
+                        .citizenName(r.getCitizen().getFullName())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -748,6 +788,38 @@ public class RescueRequestServiceImpl implements RescueRequestService {
         return enrichEmergencyActionStatus(mapper.toResponse(entity));
     }
 
+    @Override
+    public List<com.floodrescue.module.rescue.dto.response.AttachmentUploadResponse> uploadAttachments(List<org.springframework.web.multipart.MultipartFile> files) throws java.io.IOException {
+        if (files == null || files.isEmpty()) {
+            throw new BusinessException("Không có file nào được tải lên");
+        }
+        if (files.size() > MAX_UPLOAD_FILES) {
+            throw new BusinessException("Tối đa " + MAX_UPLOAD_FILES + " file mỗi lần upload");
+        }
+
+        List<com.floodrescue.module.rescue.dto.response.AttachmentUploadResponse> result = new java.util.ArrayList<>();
+
+        for (org.springframework.web.multipart.MultipartFile file : files) {
+            if (file.isEmpty()) continue;
+
+            String contentType = file.getContentType();
+            if (contentType == null || !ALLOWED_MIME_TYPES.contains(contentType)) {
+                throw new BusinessException("Chỉ chấp nhận file ảnh (jpg, png, gif, webp)");
+            }
+
+            // Extension is derived from validated MIME type, NOT from user-supplied filename
+                String ext = MIME_TO_EXT.get(contentType);
+                StoredFile storedFile = fileStorageService.storeRescueAttachment(file, ext);
+
+            result.add(com.floodrescue.module.rescue.dto.response.AttachmentUploadResponse.builder()
+                    .fileUrl(storedFile.publicUrl())
+                    .fileType(com.floodrescue.shared.enums.AttachmentFileType.IMAGE)
+                    .build());
+        }
+
+        return result;
+    }
+
     private void createTimelineEntry(
             RescueRequestEntity rescueRequest,
             UserEntity actor,
@@ -820,6 +892,15 @@ public class RescueRequestServiceImpl implements RescueRequestService {
         if (mapped == null || mapped == entity.getStatus()) {
             return entity;
         }
+
+        // Avoid downgrading terminal request states from stale/incomplete task-group status.
+        if (entity.getStatus() == RescueRequestStatus.COMPLETED && mapped != RescueRequestStatus.COMPLETED) {
+            return entity;
+        }
+        if (entity.getStatus() == RescueRequestStatus.CANCELLED && mapped != RescueRequestStatus.CANCELLED) {
+            return entity;
+        }
+
         entity.setStatus(mapped);
         if (mapped == RescueRequestStatus.COMPLETED) {
             entity.setRescueResultConfirmationStatus("PENDING");
@@ -954,6 +1035,9 @@ public class RescueRequestServiceImpl implements RescueRequestService {
     }
 
     private void validateCitizenCanCreateRequest(UserEntity citizen) {
+        if (citizen.getStatus() == null || citizen.getStatus() != 1) {
+            throw new BusinessException("Tài khoản không hoạt động, không thể gửi yêu cầu cứu hộ");
+        }
         if (Boolean.TRUE.equals(citizen.getRescueRequestBlocked())) {
             String reason = normalizeText(citizen.getRescueRequestBlockedReason());
             if (reason == null) {

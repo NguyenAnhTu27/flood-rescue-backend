@@ -15,7 +15,9 @@ public interface IssueRepository extends JpaRepository<InventoryIssueEntity, Lon
 
     Page<InventoryIssueEntity> findByStatus(InventoryDocumentStatus status, Pageable pageable);
 
-    Optional<InventoryIssueEntity> findFirstByReliefRequestIdOrderByIdDesc(Long reliefRequestId);
+    Optional<InventoryIssueEntity> findFirstByReliefRequest_IdOrderByIdDesc(Long reliefRequestId);
+
+    List<InventoryIssueEntity> findTop2ByReliefRequest_IdOrderByIdDesc(Long reliefRequestId);
 
     List<InventoryIssueEntity> findByStatusOrderByUpdatedAtDesc(InventoryDocumentStatus status);
 }

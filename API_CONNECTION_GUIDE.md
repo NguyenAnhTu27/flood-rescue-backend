@@ -26,17 +26,22 @@ http://localhost:8080/api/auth
 **Response Success (200):**
 ```json
 {
-  "message": "Đăng ký Citizen thành công"
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "tokenType": "Bearer",
+  "userId": 1,
+  "fullName": "Nguyen Van A",
+  "role": "CITIZEN"
 }
 ```
 
-**Response Error (400):**
+**Response Error (400):** Body là `ApiResult` với `success: false`, `message: "Dữ liệu không hợp lệ"`, và field errors trong `data`:
 ```json
 {
+  "success": false,
   "message": "Dữ liệu không hợp lệ",
-  "errors": {
-    "phone": "Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam (10-11 chữ số)",
-    "password": "Mật khẩu phải chứa ít nhất một chữ hoa, một chữ thường và một chữ số"
+  "data": {
+    "phone": "Số điện thoại không hợp lệ...",
+    "password": "Mật khẩu phải chứa ít nhất một chữ hoa..."
   }
 }
 ```
@@ -66,11 +71,12 @@ http://localhost:8080/api/auth
 }
 ```
 
-**Response Error (400):**
+**Response Error (400):** `ApiResult` với `data` là map field → message:
 ```json
 {
+  "success": false,
   "message": "Dữ liệu không hợp lệ",
-  "errors": {
+  "data": {
     "identifier": "Định danh không được để trống"
   }
 }
@@ -83,9 +89,44 @@ http://localhost:8080/api/auth
 }
 ```
 
+**Lưu ý:** Mọi response (success/error) đều bọc trong `ApiResult`: `{ "success": true|false, "message": "...", "data": ... }`. Lỗi validation (400) có field-level errors trong `data` (object map field → message), không phải key `errors` ở root.
+
 ---
 
-## 3. 💻 Code Examples
+## 3. 🔑 Quên mật khẩu (Forgot Password)
+
+**Endpoint:** `POST /api/auth/forgot-password`
+
+**Request Body (ForgotPasswordRequest):**
+```json
+{
+  "identifier": "user@example.com"
+}
+```
+`identifier`: email hoặc số điện thoại của tài khoản.
+
+**Response Success (200):** `ApiResult` với message xác nhận gửi link đặt lại mật khẩu (nếu có).
+
+---
+
+## 4. 🔐 Đặt lại mật khẩu (Reset Password)
+
+**Endpoint:** `POST /api/auth/reset-password`
+
+**Request Body (ResetPasswordRequest):**
+```json
+{
+  "token": "token-từ-email-hoặc-link",
+  "newPassword": "Abc12345"
+}
+```
+`newPassword`: mật khẩu mới (6–72 ký tự, có ít nhất 1 chữ hoa, 1 chữ thường, 1 chữ số).
+
+**Response Success (200):** `ApiResult` với message "Đặt lại mật khẩu thành công".
+
+---
+
+## 5. 💻 Code Examples
 
 ### React/JavaScript với Fetch API
 
@@ -113,6 +154,16 @@ async function register(fullName, phone, email, password) {
     
     if (!response.ok) {
       throw new Error(data.message || 'Đăng ký thất bại');
+    }
+
+    // Sau khi đăng ký thành công, BE trả token luôn
+    if (data.token) {
+      localStorage.setItem('accessToken', data.token);
+      localStorage.setItem('user', JSON.stringify({
+        userId: data.userId,
+        fullName: data.fullName,
+        role: data.role
+      }));
     }
 
     return data;
@@ -330,7 +381,7 @@ function LoginForm() {
 
 ---
 
-## 4. ⚠️ Lưu ý quan trọng
+## 6. ⚠️ Lưu ý quan trọng
 
 ### ✅ Phải có:
 1. **Content-Type header:** `Content-Type: application/json`
@@ -388,7 +439,7 @@ body: JSON.stringify({ identifier, password })
 
 ---
 
-## 5. 🔒 CORS Configuration
+## 7. 🔒 CORS Configuration
 
 Backend đã cấu hình CORS cho `http://localhost:5173` (Vite default port).
 
@@ -401,7 +452,7 @@ config.setAllowedOrigins(List.of("http://localhost:5173")); // Vite default
 
 ---
 
-## 6. 🧪 Test với Postman/cURL
+## 8. 🧪 Test với Postman/cURL
 
 ### cURL - Register
 ```bash
@@ -431,3 +482,85 @@ curl -X GET http://localhost:8080/api/user/profile \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
+
+---
+
+## 9. 🔄 Gọi các API create/update có bảo vệ (Rescue/Relief/Admin)
+
+Khi gọi các API cần xác thực (ví dụ: tạo/cập nhật yêu cầu cứu hộ, cập nhật kho, admin CRUD), **luôn dùng chung HTTP client đã gắn interceptor Authorization**, không gọi `fetch`/`axios` riêng lẻ.
+
+Ví dụ với Axios client ở trên:
+
+```javascript
+// rescueApi.js
+import api from './api'; // instance đã gắn interceptor Authorization
+
+// Tạo yêu cầu cứu hộ (create)
+export const createRescueRequest = (payload) => {
+  return api.post('/rescue/requests', payload);
+};
+
+// Cập nhật yêu cầu cứu hộ (update)
+export const updateRescueRequest = (id, payload) => {
+  return api.put(`/rescue/requests/${id}`, payload);
+};
+
+// Ví dụ gọi trong component:
+// createRescueRequest(formValues) -> BE sẽ nhận header:
+// Authorization: Bearer <accessToken>
+```
+
+Nếu bắt buộc phải dùng `fetch`, hãy tự thêm header Authorization:
+
+```javascript
+const token = localStorage.getItem('accessToken');
+
+await fetch('http://localhost:8080/api/rescue/requests', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+  },
+  body: JSON.stringify(payload),
+});
+```
+
+---
+
+## 10. 🌐 Reverse Proxy / NGINX (prod)
+
+Nếu backend được đặt sau NGINX / gateway, cần đảm bảo:
+
+- **Forward đầy đủ header Authorization** về Spring Boot.
+- Không chặn CORS cho các method write (POST/PUT/PATCH/DELETE/OPTIONS).
+
+Ví dụ cấu hình NGINX cơ bản:
+
+```nginx
+location /api/ {
+    proxy_pass http://your-backend:8080;
+
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # Quan trọng: forward Authorization header cho JWT
+    proxy_set_header Authorization $http_authorization;
+
+    # CORS (tuỳ chỉnh domain frontend thực tế)
+    add_header Access-Control-Allow-Origin https://your-frontend-domain.com always;
+    add_header Access-Control-Allow-Credentials true always;
+    add_header Access-Control-Allow-Headers "Origin, Content-Type, Accept, Authorization" always;
+    add_header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS" always;
+
+    if ($request_method = OPTIONS) {
+        return 204;
+    }
+}
+```
+
+Khi deploy, hãy:
+
+1. Xác nhận request từ browser tới NGINX **có header Authorization**.
+2. Kiểm tra log backend (với logging DEBUG đã bật cho security) để chắc chắn Spring Boot cũng thấy header này và log từ `JwtAuthenticationFilter` hiển thị đúng.

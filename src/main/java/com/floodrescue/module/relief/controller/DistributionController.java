@@ -4,6 +4,8 @@ import com.floodrescue.module.relief.dto.request.DistributionTaskAssignRequest;
 import com.floodrescue.module.relief.dto.request.DistributionVoucherCreateRequest;
 import com.floodrescue.module.relief.dto.response.DistributionVoucherResponse;
 import com.floodrescue.module.relief.service.DistributionService;
+import com.floodrescue.shared.dto.ApiResult;
+import com.floodrescue.shared.dto.PagedData;
 import com.floodrescue.shared.enums.InventoryDocumentStatus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -47,11 +49,11 @@ public class DistributionController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<DistributionVoucherResponse>> listVouchers(
+    public ResponseEntity<ApiResult<PagedData<DistributionVoucherResponse>>> listVouchers(
             @RequestParam(required = false) InventoryDocumentStatus status,
             @PageableDefault(size = 20) Pageable pageable
     ) {
-        return ResponseEntity.ok(distributionService.listVouchers(status, pageable));
+        return ResponseEntity.ok(ApiResult.ok(PagedData.from(distributionService.listVouchers(status, pageable))));
     }
 
     @PutMapping("/{id}/assignment")

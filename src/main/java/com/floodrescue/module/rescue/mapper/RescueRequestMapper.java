@@ -4,7 +4,9 @@ import com.floodrescue.module.rescue.dto.response.RescueRequestResponse;
 import com.floodrescue.module.rescue.entity.RescueRequestAttachmentEntity;
 import com.floodrescue.module.rescue.entity.RescueRequestEntity;
 import com.floodrescue.module.rescue.entity.RescueRequestTimelineEntity;
+import com.floodrescue.shared.enums.RescueRequestStatus;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -42,7 +44,7 @@ public class RescueRequestMapper {
                 .rescueResultConfirmationStatus(entity.getRescueResultConfirmationStatus())
                 .rescueResultConfirmationNote(entity.getRescueResultConfirmationNote())
                 .rescueResultConfirmedAt(entity.getRescueResultConfirmedAt())
-                .waitingCitizenRescueConfirmation(false)
+                .waitingCitizenRescueConfirmation(isWaitingCitizenConfirmation(entity))
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt());
 
@@ -52,6 +54,18 @@ public class RescueRequestMapper {
         }
 
         return builder.build();
+    }
+
+    /**
+     * True when status is COMPLETED and citizen has not yet confirmed rescue result
+     * (rescueResultConfirmationStatus is null, empty, or "PENDING").
+     */
+    private static boolean isWaitingCitizenConfirmation(RescueRequestEntity entity) {
+        if (entity == null || entity.getStatus() != RescueRequestStatus.COMPLETED) {
+            return false;
+        }
+        String status = entity.getRescueResultConfirmationStatus();
+        return !StringUtils.hasText(status) || "PENDING".equalsIgnoreCase(status.trim());
     }
 
     public RescueRequestResponse toResponseWithDetails(

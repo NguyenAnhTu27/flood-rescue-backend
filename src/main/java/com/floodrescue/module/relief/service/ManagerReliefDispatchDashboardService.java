@@ -39,7 +39,7 @@ public class ManagerReliefDispatchDashboardService {
                         .id(r.getId())
                         .code(r.getCode())
                         .priority("MEDIUM")
-                        .peopleCount(extractPeopleCount(r.getNote()))
+                        .affectedPeopleCount(extractPeopleCount(r.getNote()))
                         .timeAgo(formatTimeAgo(r.getCreatedAt()))
                         .status(r.getStatus() != null ? r.getStatus().name() : "DRAFT")
                         .waitingForTeam(
