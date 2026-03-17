@@ -43,8 +43,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResult<Void>> handleDataIntegrity(DataIntegrityViolationException ex) {
+        String message = resolveDataIntegrityMessage(ex);
+        log.warn("Data integrity violation: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(ApiResult.error("Không thể xóa vì người dùng đang có dữ liệu liên kết trong hệ thống hoặc dữ liệu liên kết không hợp lệ."));
+            .body(ApiResult.error(message));
     }
 
     @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
@@ -59,5 +61,24 @@ public class GlobalExceptionHandler {
         log.error("Unhandled exception: {}", ex.getMessage(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResult.error("Hệ thống gặp lỗi, vui lòng thử lại"));
+    }
+
+    private String resolveDataIntegrityMessage(DataIntegrityViolationException ex) {
+        String rawMessage = ex.getMostSpecificCause() == null
+                ? ex.getMessage()
+                : ex.getMostSpecificCause().getMessage();
+        String normalized = rawMessage == null ? "" : rawMessage.toLowerCase(Locale.ROOT);
+
+        if (normalized.contains("data too long") || normalized.contains("data truncation")) {
+            return "Dữ liệu lưu vượt quá giới hạn cho phép. Vui lòng rút gọn nội dung hoặc kiểm tra cấu hình dữ liệu.";
+        }
+        if (normalized.contains("foreign key") || normalized.contains("constraint fails")) {
+            return "Không thể cập nhật dữ liệu vì đang có ràng buộc liên kết trong hệ thống.";
+        }
+        if (normalized.contains("duplicate") || normalized.contains("unique")) {
+            return "Dữ liệu bị trùng với bản ghi hiện có trong hệ thống.";
+        }
+
+        return "Không thể lưu dữ liệu do vi phạm ràng buộc hệ thống. Vui lòng kiểm tra lại dữ liệu gửi lên.";
     }
 }

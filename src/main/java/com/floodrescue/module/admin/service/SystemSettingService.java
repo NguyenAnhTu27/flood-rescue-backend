@@ -14,12 +14,14 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SystemSettingService {
 
+	private static final int SETTING_VALUE_MAX_LENGTH = 500;
+
 	private final JdbcTemplate jdbcTemplate;
 
 	@Transactional(readOnly = true)
 	public Map<String, String> getAllSystemSettings() {
 		List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-				"SELECT COALESCE(setting_key, key_name) AS k, COALESCE(setting_value, value_text) AS v FROM system_settings"
+				"SELECT COALESCE(setting_key, key_name) AS k, COALESCE(NULLIF(value_text, ''), setting_value) AS v FROM system_settings"
 		);
 		Map<String, String> values = new HashMap<>();
 		for (Map<String, Object> row : rows) {
@@ -75,11 +77,15 @@ public class SystemSettingService {
 	}
 
 	private void upsertSystemSetting(String key, String value, Long actorId) {
+		String normalizedValue = value == null ? "" : value;
+		String shortValue = normalizedValue.length() <= SETTING_VALUE_MAX_LENGTH
+				? normalizedValue
+				: normalizedValue.substring(0, SETTING_VALUE_MAX_LENGTH);
 		jdbcTemplate.update(
 				"INSERT INTO system_settings(setting_key, setting_value, key_name, value_text, value_type, updated_by, updated_at) " +
 						"VALUES (?, ?, ?, ?, 'STRING', ?, NOW()) " +
 						"ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), value_text = VALUES(value_text), updated_by = VALUES(updated_by), updated_at = NOW()",
-				key, value, key, value, actorId
+				key, shortValue, key, normalizedValue, actorId
 		);
 	}
 }

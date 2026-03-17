@@ -1,5 +1,7 @@
 package com.floodrescue.module.admin.service;
 
+import com.floodrescue.module.admin.dto.AdminUserCreateRequest;
+import com.floodrescue.module.admin.dto.AdminUserUpdateRequest;
 import com.floodrescue.shared.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -85,13 +87,13 @@ public class AdminUserService {
 	}
 
 	@Transactional
-	public void createUser(Map<String, Object> payload) {
-		String fullName = String.valueOf(payload.getOrDefault("fullName", "")).trim();
-		String email = String.valueOf(payload.getOrDefault("email", "")).trim().toLowerCase();
-		String phone = String.valueOf(payload.getOrDefault("phone", "")).trim();
-		String password = String.valueOf(payload.getOrDefault("password", ""));
-		Integer roleId = payload.get("roleId") == null ? null : Integer.parseInt(String.valueOf(payload.get("roleId")));
-		Long teamId = payload.get("teamId") == null ? null : Long.parseLong(String.valueOf(payload.get("teamId")));
+	public void createUser(AdminUserCreateRequest request) {
+		String fullName = request.getFullName().trim();
+		String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
+		String phone = request.getPhone() == null ? "" : request.getPhone().trim();
+		String password = request.getPassword();
+		Integer roleId = request.getRoleId();
+		Long teamId = request.getTeamId();
 
 		if (fullName.isEmpty() || password.isEmpty() || roleId == null) {
 			throw new BusinessException("Thiếu dữ liệu bắt buộc");
@@ -119,14 +121,20 @@ public class AdminUserService {
 	}
 
 	@Transactional
-	public Map<String, Object> updateUser(Long id, Map<String, Object> payload) {
+	public Map<String, Object> updateUser(Long id, AdminUserUpdateRequest request) {
 		Map<String, Object> before = jdbcTemplate.queryForMap("SELECT * FROM users WHERE id = ?", id);
 
-		String fullName = String.valueOf(payload.getOrDefault("fullName", before.get("full_name"))).trim();
-		String email = payload.get("email") == null ? null : String.valueOf(payload.get("email")).trim().toLowerCase();
-		String phone = payload.get("phone") == null ? null : String.valueOf(payload.get("phone")).trim();
-		Integer roleId = payload.get("roleId") == null ? ((Number) before.get("role_id")).intValue() : Integer.parseInt(String.valueOf(payload.get("roleId")));
-		String status = String.valueOf(payload.getOrDefault("status", ((Number) before.get("status")).intValue() == 1 ? "ACTIVE" : "LOCKED"));
+		String fullName = request.getFullName() == null
+				? String.valueOf(before.get("full_name"))
+				: request.getFullName().trim();
+		String email = request.getEmail() == null ? null : request.getEmail().trim().toLowerCase();
+		String phone = request.getPhone() == null ? null : request.getPhone().trim();
+		Integer roleId = request.getRoleId() == null
+				? ((Number) before.get("role_id")).intValue()
+				: request.getRoleId();
+		String status = request.getStatus() == null
+				? (((Number) before.get("status")).intValue() == 1 ? "ACTIVE" : "LOCKED")
+				: request.getStatus();
 		int statusVal = "ACTIVE".equalsIgnoreCase(status) ? 1 : 0;
 
 		jdbcTemplate.update(

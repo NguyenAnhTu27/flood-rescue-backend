@@ -4,6 +4,8 @@ services:
     container_name: flood_rescue_mysql
     restart: unless-stopped
     environment:
+      # ⚠️ Chỉ dùng cấu hình này cho môi trường local development.
+      # Trên staging/production hãy override bằng biến môi trường an toàn hơn.
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: flood_rescue
       MYSQL_CHARACTER_SET_SERVER: utf8mb4

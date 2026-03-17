@@ -34,14 +34,17 @@ http://localhost:8080/api/auth
 }
 ```
 
-**Response Error (400):** Body là `ApiResult` với `success: false`, `message: "Dữ liệu không hợp lệ"`, và field errors trong `data`:
+**Response Error (400):** Body là `ApiResult` với `success: false`, `message: "Dữ liệu không hợp lệ"`, và field errors nằm trong `data.errors`:
 ```json
 {
   "success": false,
   "message": "Dữ liệu không hợp lệ",
   "data": {
-    "phone": "Số điện thoại không hợp lệ...",
-    "password": "Mật khẩu phải chứa ít nhất một chữ hoa..."
+    "message": "Dữ liệu không hợp lệ",
+    "errors": {
+      "phone": "Số điện thoại không hợp lệ...",
+      "password": "Mật khẩu phải chứa ít nhất một chữ hoa..."
+    }
   }
 }
 ```
@@ -71,13 +74,16 @@ http://localhost:8080/api/auth
 }
 ```
 
-**Response Error (400):** `ApiResult` với `data` là map field → message:
+**Response Error (400):** `ApiResult` với `data.errors` là map field → message:
 ```json
 {
   "success": false,
   "message": "Dữ liệu không hợp lệ",
   "data": {
-    "identifier": "Định danh không được để trống"
+    "message": "Dữ liệu không hợp lệ",
+    "errors": {
+      "identifier": "Định danh không được để trống"
+    }
   }
 }
 ```
@@ -89,7 +95,7 @@ http://localhost:8080/api/auth
 }
 ```
 
-**Lưu ý:** Mọi response (success/error) đều bọc trong `ApiResult`: `{ "success": true|false, "message": "...", "data": ... }`. Lỗi validation (400) có field-level errors trong `data` (object map field → message), không phải key `errors` ở root.
+**Lưu ý:** Mọi response (success/error) đều bọc trong `ApiResult`: `{ "success": true|false, "message": "...", "data": ... }`. Lỗi validation (400) có field-level errors trong `data.errors` (object map field → message), không phải key `errors` ở root.
 
 ---
 
@@ -219,10 +225,10 @@ function getAuthHeaders() {
   };
 }
 
-// Ví dụ: Gọi API có authentication
+// Ví dụ: Gọi API có authentication (lấy thông tin user hiện tại)
 async function getProfile() {
   try {
-    const response = await fetch('http://localhost:8080/api/user/profile', {
+    const response = await fetch('http://localhost:8080/api/auth/me', {
       method: 'GET',
       headers: getAuthHeaders()
     });
@@ -238,7 +244,9 @@ async function getProfile() {
       throw new Error('Lấy thông tin thất bại');
     }
 
-    return await response.json();
+    const result = await response.json();
+    // result có dạng: { success, message, data }
+    return result.data;
   } catch (error) {
     console.error('Get profile error:', error);
     throw error;
@@ -476,9 +484,9 @@ curl -X POST http://localhost:8080/api/auth/login \
   }'
 ```
 
-### cURL - Login với Token
+### cURL - Lấy thông tin user hiện tại với Token
 ```bash
-curl -X GET http://localhost:8080/api/user/profile \
+curl -X GET http://localhost:8080/api/auth/me \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
 ```

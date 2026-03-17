@@ -67,7 +67,7 @@ public class RuntimeSettingsServiceImpl implements RuntimeSettingsService {
     private Map<String, String> loadAllSettings() {
         Map<String, String> values = new HashMap<>();
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT COALESCE(setting_key, key_name) AS k, COALESCE(setting_value, value_text) AS v FROM system_settings"
+                "SELECT COALESCE(setting_key, key_name) AS k, COALESCE(NULLIF(value_text, ''), setting_value) AS v FROM system_settings"
         );
         for (Map<String, Object> row : rows) {
             String key = row.get("k") == null ? null : String.valueOf(row.get("k"));

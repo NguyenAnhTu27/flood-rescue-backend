@@ -86,7 +86,12 @@ class AdminUserControllerTest {
         org.mockito.Mockito.doThrow(new BusinessException("Email đã tồn tại"))
                 .when(adminUserService).createUser(any());
 
-        Map<String, Object> payload = Map.of("email", "dup@example.com");
+        Map<String, Object> payload = Map.of(
+                "fullName", "Dup User",
+                "email", "dup@example.com",
+                "password", "Test1234",
+                "roleId", 1
+        );
 
         mockMvc.perform(post("/api/admin/create-user")
                         .contentType(MediaType.APPLICATION_JSON)
