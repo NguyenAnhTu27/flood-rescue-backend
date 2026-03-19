@@ -93,10 +93,48 @@ Content-Type: application/json
 **Body (JSON):**
 ```json
 {
-  "token": "reset-token-from-email",
+  "email": "nguyenvana@example.com",
+  "code": "123456",
   "newPassword": "Password123"
 }
 ```
+
+---
+
+## Feedback thread quick test
+
+### Public feedback list (for citizen page)
+
+**GET** `{{base_url}}/api/public/feedbacks?page=0&size=20`
+
+### Public replies by feedback id
+
+**GET** `{{base_url}}/api/public/feedbacks/1/replies`
+
+### Citizen reply to feedback
+
+**POST** `{{base_url}}/api/feedback/citizen/1/replies`
+
+**Headers:**
+```
+Content-Type: application/json
+Authorization: Bearer {{token}}
+```
+
+**Body (JSON):**
+```json
+{
+  "content": "Cam on doi ngu da ho tro"
+}
+```
+
+### Admin reply to feedback
+
+**POST** `{{base_url}}/api/feedback/admin/1/replies`
+
+### Admin soft-delete feedback (moderation)
+
+**DELETE** `{{base_url}}/api/feedback/admin/1?reason=Noi%20dung%20sai%20lech`
 
 ---
 

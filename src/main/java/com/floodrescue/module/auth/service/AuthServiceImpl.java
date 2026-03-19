@@ -1,6 +1,7 @@
 package com.floodrescue.module.auth.service;
 
 import com.floodrescue.config.security.JwtTokenProvider;
+import com.floodrescue.module.auth.config.PasswordResetSettings;
 import com.floodrescue.module.auth.dto.request.ForgotPasswordRequest;
 import com.floodrescue.module.auth.dto.request.LoginRequest;
 import com.floodrescue.module.auth.dto.request.RegisterCitizenRequest;
@@ -31,6 +32,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.UUID;
 
 @Service
@@ -43,6 +45,10 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthRefreshTokenRepository refreshTokenRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final PasswordResetEmailService passwordResetEmailService;
+    private final PasswordResetSettings passwordResetSettings;
+
+    private static final int PASSWORD_RESET_CODE_LENGTH = 6;
 
     @Override
     public void registerCitizen(RegisterCitizenRequest req) {
@@ -233,51 +239,61 @@ public class AuthServiceImpl implements AuthService {
         // Trả thông điệp chung để tránh user enumeration.
         if (user == null) {
             return ForgotPasswordResponse.builder()
-                    .message("Nếu tài khoản tồn tại, hệ thống đã tạo yêu cầu đặt lại mật khẩu")
+                    .message("Nếu tài khoản tồn tại, mã xác nhận đã được gửi về email")
                     .build();
         }
 
-        String rawToken = UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
-        String tokenHash = hashToken(rawToken);
+        String normalizedEmail = normalizeEmail(user.getEmail());
+        if (normalizedEmail == null) {
+            throw new BusinessException("Tài khoản chưa liên kết email để nhận mã xác nhận");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        revokeOutstandingResetTokens(user.getId(), now);
+
+        String resetCode = generatePasswordResetCode(normalizedEmail);
+        String tokenHash = hashPasswordResetCode(normalizedEmail, resetCode);
 
         PasswordResetTokenEntity entity = PasswordResetTokenEntity.builder()
                 .user(user)
                 .tokenHash(tokenHash)
-                .expiresAt(LocalDateTime.now().plusMinutes(15))
+                .expiresAt(now.plusMinutes(passwordResetSettings.getExpiryMinutes()))
                 .used(false)
-                .createdAt(LocalDateTime.now())
+                .createdAt(now)
                 .build();
 
         passwordResetTokenRepository.save(entity);
+        passwordResetEmailService.sendResetCode(normalizedEmail, user.getFullName(), resetCode, passwordResetSettings.getExpiryMinutes());
 
-        // Dev fallback: trả token cho FE vì project chưa có hạ tầng email/SMS.
         return ForgotPasswordResponse.builder()
-                .message("Mã đặt lại mật khẩu đã được tạo")
-                .resetToken(rawToken)
-                .expiresInMinutes(15)
+                .message("Nếu tài khoản tồn tại, mã xác nhận đã được gửi về email")
+                .maskedEmail(maskEmail(normalizedEmail))
+                .expiresInMinutes(passwordResetSettings.getExpiryMinutes())
                 .build();
     }
 
     @Override
     @Transactional
     public void resetPassword(ResetPasswordRequest req) {
-        String rawToken = req.getToken() != null ? req.getToken().trim() : "";
-        if (rawToken.isBlank()) {
-            throw new BusinessException("token không được để trống");
-        }
+        String normalizedEmail = normalizeEmail(req.getEmail());
+        String rawCode = req.getCode() != null ? req.getCode().trim() : "";
 
-        String tokenHash = hashToken(rawToken);
+        String tokenHash = hashPasswordResetCode(normalizedEmail, rawCode);
         PasswordResetTokenEntity tokenEntity = passwordResetTokenRepository.findByTokenHash(tokenHash)
-                .orElseThrow(() -> new BusinessException("Token đặt lại mật khẩu không hợp lệ"));
+                .orElseThrow(() -> new BusinessException("Mã xác nhận không hợp lệ hoặc đã hết hạn"));
 
         if (Boolean.TRUE.equals(tokenEntity.getUsed())) {
-            throw new BusinessException("Token đặt lại mật khẩu đã được sử dụng");
+            throw new BusinessException("Mã xác nhận đã được sử dụng");
         }
         if (tokenEntity.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new BusinessException("Token đặt lại mật khẩu đã hết hạn");
+            throw new BusinessException("Mã xác nhận đã hết hạn");
         }
 
         UserEntity user = tokenEntity.getUser();
+        if (!normalizedEmail.equals(normalizeEmail(user.getEmail()))) {
+            throw new BusinessException("Mã xác nhận không hợp lệ hoặc đã hết hạn");
+        }
+
         user.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
         user.setUpdatedAt(LocalDateTime.now());
         userRepo.save(user);
@@ -325,6 +341,58 @@ public class AuthServiceImpl implements AuthService {
 
         refreshTokenRepository.save(token);
         return rawToken;
+    }
+
+    private void revokeOutstandingResetTokens(Long userId, LocalDateTime now) {
+        List<PasswordResetTokenEntity> activeTokens = passwordResetTokenRepository.findAllByUserIdAndUsedFalse(userId);
+        if (activeTokens.isEmpty()) {
+            return;
+        }
+        activeTokens.forEach(token -> {
+            token.setUsed(true);
+            token.setUsedAt(now);
+        });
+        passwordResetTokenRepository.saveAll(activeTokens);
+    }
+
+    private String generatePasswordResetCode(String normalizedEmail) {
+        for (int attempt = 0; attempt < 10; attempt++) {
+            String code = String.format("%0" + PASSWORD_RESET_CODE_LENGTH + "d",
+                    ThreadLocalRandom.current().nextInt((int) Math.pow(10, PASSWORD_RESET_CODE_LENGTH)));
+            String tokenHash = hashPasswordResetCode(normalizedEmail, code);
+            if (passwordResetTokenRepository.findByTokenHash(tokenHash).isEmpty()) {
+                return code;
+            }
+        }
+        throw new IllegalStateException("Không thể tạo mã xác nhận duy nhất");
+    }
+
+    private String hashPasswordResetCode(String normalizedEmail, String code) {
+        return hashToken(normalizedEmail + ":" + code);
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return null;
+        }
+        return email.trim().toLowerCase();
+    }
+
+    private String maskEmail(String email) {
+        int atIndex = email.indexOf('@');
+        if (atIndex <= 1) {
+            return "***";
+        }
+        String localPart = email.substring(0, atIndex);
+        String domain = email.substring(atIndex + 1);
+        String maskedLocal = localPart.charAt(0) + "***" + localPart.charAt(localPart.length() - 1);
+        int dotIndex = domain.indexOf('.');
+        if (dotIndex <= 1) {
+            return maskedLocal + "@***";
+        }
+        String domainName = domain.substring(0, dotIndex);
+        String suffix = domain.substring(dotIndex);
+        return maskedLocal + "@" + domainName.charAt(0) + "***" + suffix;
     }
 
     private String hashToken(String rawToken) {

@@ -31,6 +31,7 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
             alignNotificationColumns();
             alignTeamLocationColumns();
             alignSystemFeedbackTable();
+            alignSystemFeedbackRepliesTable();
             alignInventoryClassifications();
             alignInventoryUnits();
             alignReliefRequestWorkflow();
@@ -189,6 +190,9 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
     }
 
     private void alignRescueRequestLocationColumns() {
+        if (!columnExists("rescue_requests", "contact_phone")) {
+            exec("ALTER TABLE rescue_requests ADD COLUMN contact_phone VARCHAR(20) NULL AFTER description");
+        }
         if (!columnExists("rescue_requests", "latitude")) {
             exec("ALTER TABLE rescue_requests ADD COLUMN latitude DOUBLE NULL AFTER address_text");
         }
@@ -257,6 +261,10 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
                     rescued_confirmed TINYINT(1) NOT NULL DEFAULT 0,
                     relief_confirmed TINYINT(1) NOT NULL DEFAULT 0,
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    deleted TINYINT(1) NOT NULL DEFAULT 0,
+                    deleted_at DATETIME NULL,
+                    deleted_by_user_id BIGINT UNSIGNED NULL,
+                    delete_reason VARCHAR(500) NULL,
                     PRIMARY KEY (id)
                 )
                 """);
@@ -272,6 +280,18 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
         }
         if (!columnExists("system_feedbacks", "created_at")) {
             exec("ALTER TABLE system_feedbacks ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER relief_confirmed");
+        }
+        if (!columnExists("system_feedbacks", "deleted")) {
+            exec("ALTER TABLE system_feedbacks ADD COLUMN deleted TINYINT(1) NOT NULL DEFAULT 0 AFTER created_at");
+        }
+        if (!columnExists("system_feedbacks", "deleted_at")) {
+            exec("ALTER TABLE system_feedbacks ADD COLUMN deleted_at DATETIME NULL AFTER deleted");
+        }
+        if (!columnExists("system_feedbacks", "deleted_by_user_id")) {
+            exec("ALTER TABLE system_feedbacks ADD COLUMN deleted_by_user_id " + expectedUserIdType() + " NULL AFTER deleted_at");
+        }
+        if (!columnExists("system_feedbacks", "delete_reason")) {
+            exec("ALTER TABLE system_feedbacks ADD COLUMN delete_reason VARCHAR(500) NULL AFTER deleted_by_user_id");
         }
 
         // Ensure citizen_id type is compatible with users.id (common mismatch: BIGINT vs BIGINT UNSIGNED).
@@ -293,12 +313,92 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
         if (!indexExists("system_feedbacks", "idx_system_feedbacks_created")) {
             exec("ALTER TABLE system_feedbacks ADD INDEX idx_system_feedbacks_created (created_at)");
         }
+        if (!indexExists("system_feedbacks", "idx_system_feedbacks_deleted")) {
+            exec("ALTER TABLE system_feedbacks ADD INDEX idx_system_feedbacks_deleted (deleted)");
+        }
         if (!constraintExists("system_feedbacks", "fk_system_feedbacks_citizen")) {
             try {
                 exec("ALTER TABLE system_feedbacks ADD CONSTRAINT fk_system_feedbacks_citizen FOREIGN KEY (citizen_id) REFERENCES users(id)");
             } catch (Exception e) {
                 // Do not block startup because of legacy DB type drift; feedback module can still operate.
                 log.warn("[SchemaCompatibility] Skip adding fk_system_feedbacks_citizen: {}", e.getMessage());
+            }
+        }
+        if (!constraintExists("system_feedbacks", "fk_system_feedbacks_deleted_by")) {
+            try {
+                exec("ALTER TABLE system_feedbacks ADD CONSTRAINT fk_system_feedbacks_deleted_by FOREIGN KEY (deleted_by_user_id) REFERENCES users(id)");
+            } catch (Exception e) {
+                log.warn("[SchemaCompatibility] Skip adding fk_system_feedbacks_deleted_by: {}", e.getMessage());
+            }
+        }
+    }
+
+    private String expectedUserIdType() {
+        String userIdColumnType = getColumnType("users", "id");
+        return (userIdColumnType == null || userIdColumnType.isBlank())
+                ? "BIGINT UNSIGNED"
+                : userIdColumnType.toUpperCase();
+    }
+
+    private void alignSystemFeedbackRepliesTable() {
+        String userIdColumnType = getColumnType("users", "id");
+        String expectedUserIdType = (userIdColumnType == null || userIdColumnType.isBlank())
+                ? "BIGINT UNSIGNED"
+                : userIdColumnType.toUpperCase();
+
+        String feedbackIdColumnType = getColumnType("system_feedbacks", "id");
+        String expectedFeedbackIdType = (feedbackIdColumnType == null || feedbackIdColumnType.isBlank())
+                ? "BIGINT"
+                : feedbackIdColumnType.toUpperCase();
+
+        exec("""
+                CREATE TABLE IF NOT EXISTS system_feedback_replies (
+                    id BIGINT NOT NULL AUTO_INCREMENT,
+                    feedback_id BIGINT NOT NULL,
+                    user_id BIGINT UNSIGNED NOT NULL,
+                    role_code VARCHAR(30) NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (id),
+                    KEY idx_feedback_replies_feedback (feedback_id),
+                    KEY idx_feedback_replies_user (user_id),
+                    KEY idx_feedback_replies_created (created_at)
+                )
+                """);
+
+        String currentFeedbackIdType = getColumnType("system_feedback_replies", "feedback_id");
+        if (currentFeedbackIdType == null || !currentFeedbackIdType.equalsIgnoreCase(expectedFeedbackIdType)) {
+            exec("ALTER TABLE system_feedback_replies MODIFY feedback_id " + expectedFeedbackIdType + " NOT NULL");
+        }
+
+        String currentUserIdType = getColumnType("system_feedback_replies", "user_id");
+        if (currentUserIdType == null || !currentUserIdType.equalsIgnoreCase(expectedUserIdType)) {
+            exec("ALTER TABLE system_feedback_replies MODIFY user_id " + expectedUserIdType + " NOT NULL");
+        }
+
+        if (!indexExists("system_feedback_replies", "idx_feedback_replies_feedback")) {
+            exec("ALTER TABLE system_feedback_replies ADD INDEX idx_feedback_replies_feedback (feedback_id)");
+        }
+        if (!indexExists("system_feedback_replies", "idx_feedback_replies_user")) {
+            exec("ALTER TABLE system_feedback_replies ADD INDEX idx_feedback_replies_user (user_id)");
+        }
+        if (!indexExists("system_feedback_replies", "idx_feedback_replies_created")) {
+            exec("ALTER TABLE system_feedback_replies ADD INDEX idx_feedback_replies_created (created_at)");
+        }
+
+        if (!constraintExists("system_feedback_replies", "fk_feedback_replies_feedback")) {
+            try {
+                exec("ALTER TABLE system_feedback_replies ADD CONSTRAINT fk_feedback_replies_feedback FOREIGN KEY (feedback_id) REFERENCES system_feedbacks(id) ON DELETE CASCADE");
+            } catch (Exception e) {
+                log.warn("[SchemaCompatibility] Skip adding fk_feedback_replies_feedback: {}", e.getMessage());
+            }
+        }
+
+        if (!constraintExists("system_feedback_replies", "fk_feedback_replies_user")) {
+            try {
+                exec("ALTER TABLE system_feedback_replies ADD CONSTRAINT fk_feedback_replies_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE");
+            } catch (Exception e) {
+                log.warn("[SchemaCompatibility] Skip adding fk_feedback_replies_user: {}", e.getMessage());
             }
         }
     }
@@ -350,6 +450,15 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
     private void alignReliefRequestWorkflow() {
         if (!columnExists("relief_requests", "delivery_status")) {
             exec("ALTER TABLE relief_requests ADD COLUMN delivery_status VARCHAR(40) NOT NULL DEFAULT 'REQUESTED' AFTER status");
+        }
+        if (!columnExists("relief_requests", "phone")) {
+            exec("ALTER TABLE relief_requests ADD COLUMN phone VARCHAR(20) NULL AFTER target_area");
+        }
+        if (!columnExists("relief_requests", "priority")) {
+            exec("ALTER TABLE relief_requests ADD COLUMN priority VARCHAR(10) NULL AFTER phone");
+        }
+        if (!columnExists("relief_requests", "people_count")) {
+            exec("ALTER TABLE relief_requests ADD COLUMN people_count INT NULL AFTER priority");
         }
         if (!columnExists("relief_requests", "address_text")) {
             exec("ALTER TABLE relief_requests ADD COLUMN address_text VARCHAR(255) NULL AFTER target_area");

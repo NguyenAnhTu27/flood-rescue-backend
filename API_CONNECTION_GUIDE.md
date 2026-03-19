@@ -122,13 +122,47 @@ http://localhost:8080/api/auth
 **Request Body (ResetPasswordRequest):**
 ```json
 {
-  "token": "token-từ-email-hoặc-link",
+  "email": "user@example.com",
+  "code": "123456",
   "newPassword": "Abc12345"
 }
 ```
+`code`: mã OTP 6 chữ số nhận qua email.
 `newPassword`: mật khẩu mới (6–72 ký tự, có ít nhất 1 chữ hoa, 1 chữ thường, 1 chữ số).
 
 **Response Success (200):** `ApiResult` với message "Đặt lại mật khẩu thành công".
+
+---
+
+## 5. 💬 Feedback Thread (Citizen/Admin)
+
+### Public list for citizen page
+
+- `GET /api/public/feedbacks?page=0&size=20`
+- Alias: `GET /api/public/citizen-feedbacks?page=0&size=20`
+
+### Public replies of a feedback
+
+- `GET /api/public/feedbacks/{feedbackId}/replies`
+
+### Citizen reply
+
+- `POST /api/feedback/citizen/{feedbackId}/replies`
+
+Body:
+```json
+{
+  "content": "Noi dung tra loi"
+}
+```
+
+### Admin reply
+
+- `POST /api/feedback/admin/{feedbackId}/replies`
+
+### Admin moderate delete (soft delete + audit)
+
+- `DELETE /api/feedback/admin/{feedbackId}?reason=Noi-dung-sai-lech`
 
 ---
 

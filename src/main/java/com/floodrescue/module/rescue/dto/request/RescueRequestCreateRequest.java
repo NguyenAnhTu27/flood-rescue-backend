@@ -3,6 +3,7 @@ package com.floodrescue.module.rescue.dto.request;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.floodrescue.shared.enums.AttachmentFileType;
 import com.floodrescue.shared.enums.RescuePriority;
+import com.floodrescue.shared.validation.ValidPhoneNumber;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -21,6 +22,11 @@ public class RescueRequestCreateRequest {
     @NotBlank(message = "Mô tả không được để trống")
     @Size(max = 2000, message = "Mô tả không được vượt quá 2000 ký tự")
     private String description;
+
+    @ValidPhoneNumber(message = "Số điện thoại không hợp lệ")
+    @Size(max = 20, message = "Số điện thoại không được vượt quá 20 ký tự")
+    @JsonAlias("contactPhone")
+    private String phone;
 
     @Size(max = 255, message = "Địa chỉ không được vượt quá 255 ký tự")
     private String addressText;

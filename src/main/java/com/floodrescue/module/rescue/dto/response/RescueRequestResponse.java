@@ -29,6 +29,7 @@ public class RescueRequestResponse {
 
     private Integer affectedPeopleCount;
     private String description;
+    private String phone;
     private String addressText;
     private Double latitude;
     private Double longitude;

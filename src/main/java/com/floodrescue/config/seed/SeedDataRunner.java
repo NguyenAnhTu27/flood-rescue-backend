@@ -2,6 +2,10 @@ package com.floodrescue.config.seed;
 
 import com.floodrescue.module.asset.entity.AssetEntity;
 import com.floodrescue.module.asset.repository.AssetRepository;
+import com.floodrescue.module.feedback.entity.SystemFeedbackEntity;
+import com.floodrescue.module.feedback.entity.SystemFeedbackReplyEntity;
+import com.floodrescue.module.feedback.repository.SystemFeedbackReplyRepository;
+import com.floodrescue.module.feedback.repository.SystemFeedbackRepository;
 import com.floodrescue.module.inventory.entity.ItemCategoryEntity;
 import com.floodrescue.module.inventory.repository.ItemCategoryRepository;
 import com.floodrescue.module.relief.entity.ReliefRequestEntity;
@@ -55,6 +59,8 @@ public class SeedDataRunner implements ApplicationRunner {
     private final ReliefRequestRepository reliefRequestRepository;
     private final ReliefRequestLineRepository reliefRequestLineRepository;
     private final ItemCategoryRepository itemCategoryRepository;
+    private final SystemFeedbackRepository systemFeedbackRepository;
+    private final SystemFeedbackReplyRepository systemFeedbackReplyRepository;
 
     @Value("${app.seed.enabled:true}")
     private boolean seedEnabled;
@@ -140,6 +146,7 @@ public class SeedDataRunner implements ApplicationRunner {
         List<UserEntity> citizens = seedCitizenUsers(citizenRole);
         seedRescueRequests(citizens);
         seedReliefRequests(citizens);
+        seedFeedbacks(citizens);
 
         // Seed realistic assets for local/dev demo and normalize old placeholder data
         seedAssets();
@@ -387,6 +394,65 @@ public class SeedDataRunner implements ApplicationRunner {
             }
         }
     }
+
+        private void seedFeedbacks(List<UserEntity> citizens) {
+        if (citizens == null || citizens.isEmpty()) {
+            return;
+        }
+        if (systemFeedbackRepository.countByDeletedFalse() > 0) {
+            return;
+        }
+
+        UserEntity admin = userRepository.findByEmail(normalizeEmail(adminEmail)).orElse(null);
+
+        List<SystemFeedbackEntity> feedbacks = new ArrayList<>();
+        feedbacks.add(systemFeedbackRepository.save(SystemFeedbackEntity.builder()
+            .citizen(citizens.get(0 % citizens.size()))
+            .rating(5)
+            .feedbackContent("Doi cuu ho den nhanh va huong dan rat ro rang.")
+            .rescuedConfirmed(true)
+            .reliefConfirmed(true)
+            .deleted(false)
+            .build()));
+        feedbacks.add(systemFeedbackRepository.save(SystemFeedbackEntity.builder()
+            .citizen(citizens.get(1 % citizens.size()))
+            .rating(4)
+            .feedbackContent("Can cap nhat tinh trang don ho tro thuong xuyen hon.")
+            .rescuedConfirmed(true)
+            .reliefConfirmed(false)
+            .deleted(false)
+            .build()));
+        feedbacks.add(systemFeedbackRepository.save(SystemFeedbackEntity.builder()
+            .citizen(citizens.get(2 % citizens.size()))
+            .rating(3)
+            .feedbackContent("Da nhan duoc tiep te nhung den hoi cham.")
+            .rescuedConfirmed(false)
+            .reliefConfirmed(true)
+            .deleted(false)
+            .build()));
+
+        if (admin != null) {
+            systemFeedbackReplyRepository.save(SystemFeedbackReplyEntity.builder()
+                .feedback(feedbacks.get(0))
+                .user(admin)
+                .roleCode("ADMIN")
+                .content("Cam on ban da phan hoi. Chung toi se duy tri toc do ho tro.")
+                .build());
+            systemFeedbackReplyRepository.save(SystemFeedbackReplyEntity.builder()
+                .feedback(feedbacks.get(1))
+                .user(admin)
+                .roleCode("ADMIN")
+                .content("Da ghi nhan, doi van hanh se cap nhat tien do thuong xuyen hon.")
+                .build());
+        }
+
+        systemFeedbackReplyRepository.save(SystemFeedbackReplyEntity.builder()
+            .feedback(feedbacks.get(1))
+            .user(citizens.get(1 % citizens.size()))
+            .roleCode("CITIZEN")
+            .content("Mong he thong hien trang thai theo thoi gian thuc de de theo doi.")
+            .build());
+        }
 
     private java.util.Optional<AssetEntity> findByNormalizedCode(List<AssetEntity> assets, String expectedCode) {
         String normalizedExpected = normalizeAssetCode(expectedCode);

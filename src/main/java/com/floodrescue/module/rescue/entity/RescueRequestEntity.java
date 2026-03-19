@@ -61,6 +61,9 @@ public class RescueRequestEntity {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+        @Column(name = "contact_phone", length = 20)
+        private String contactPhone;
+
     @Column(name = "address_text", length = 255)
     private String addressText;
 

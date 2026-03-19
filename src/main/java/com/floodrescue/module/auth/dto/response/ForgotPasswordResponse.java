@@ -9,6 +9,6 @@ import lombok.Getter;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ForgotPasswordResponse {
     private String message;
-    private String resetToken;
+    private String maskedEmail;
     private Integer expiresInMinutes;
 }

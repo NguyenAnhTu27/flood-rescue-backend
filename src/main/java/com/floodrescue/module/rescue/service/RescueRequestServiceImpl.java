@@ -92,6 +92,7 @@ public class RescueRequestServiceImpl implements RescueRequestService {
                 .priority(request.getPriority())
                 .affectedPeopleCount(request.getAffectedPeopleCount())
                 .description(request.getDescription())
+            .contactPhone(request.getPhone() != null ? request.getPhone() : citizen.getPhone())
                 .addressText(request.getAddressText())
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
@@ -271,6 +272,9 @@ public class RescueRequestServiceImpl implements RescueRequestService {
         }
         if (request.getDescription() != null) {
             entity.setDescription(request.getDescription());
+        }
+        if (request.getPhone() != null) {
+            entity.setContactPhone(request.getPhone());
         }
         if (request.getAddressText() != null) {
             entity.setAddressText(request.getAddressText());

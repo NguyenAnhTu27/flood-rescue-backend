@@ -2,6 +2,7 @@ package com.floodrescue.module.relief.dto.response;
 
 import com.floodrescue.shared.enums.InventoryDocumentStatus;
 import com.floodrescue.shared.enums.ReliefDeliveryStatus;
+import com.floodrescue.shared.enums.RescuePriority;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -23,6 +24,9 @@ public class ReliefRequestResponse {
     private String createdByName;
     private String createdByPhone;
     private Long rescueRequestId;
+    private String phone;
+    private RescuePriority priority;
+    private Integer peopleCount;
     private String citizenAddressText;
     private Double citizenLatitude;
     private Double citizenLongitude;

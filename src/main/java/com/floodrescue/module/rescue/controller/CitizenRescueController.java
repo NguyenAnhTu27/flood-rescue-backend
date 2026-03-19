@@ -10,13 +10,14 @@ import com.floodrescue.module.rescue.dto.response.CitizenRescueConfirmationRespo
 import com.floodrescue.module.rescue.dto.response.RescueRequestResponse;
 import com.floodrescue.module.rescue.service.RescueRequestService;
 import com.floodrescue.shared.dto.ApiResult;
-import com.floodrescue.shared.dto.PagedData;
+import com.floodrescue.shared.dto.PageResponse;
 import com.floodrescue.shared.exception.ForbiddenException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -36,11 +37,34 @@ public class CitizenRescueController {
     private final RescueRequestService rescueRequestService;
 
     private Long getCurrentUserId(Authentication authentication) {
-        if (authentication == null || authentication.getPrincipal() == null) {
+        if (authentication == null || authentication.getPrincipal() == null || !authentication.isAuthenticated()) {
             return null;
         }
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-        return Long.parseLong(userDetails.getUsername());
+
+        Object principal = authentication.getPrincipal();
+
+        if (principal instanceof UserDetails userDetails) {
+            String username = userDetails.getUsername();
+            try {
+                return Long.parseLong(username);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+
+        if (principal instanceof String s) {
+            try {
+                return Long.parseLong(s);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+
+        if (principal instanceof Long l) {
+            return l;
+        }
+
+        return null;
     }
 
     @PostMapping("/requests")
@@ -53,12 +77,14 @@ public class CitizenRescueController {
     }
 
     @GetMapping("/requests")
-    public ResponseEntity<ApiResult<PagedData<RescueRequestResponse>>> getMyRescueRequests(
-            @PageableDefault(size = 20) Pageable pageable,
+    public ResponseEntity<PageResponse<RescueRequestResponse>> getMyRescueRequests(
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "limit", defaultValue = "20") int limit,
             Authentication authentication) {
         Long citizenId = getCurrentUserId(authentication);
+        Pageable pageable = PageRequest.of(page, limit, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<RescueRequestResponse> response = rescueRequestService.getRescueRequestsByCitizen(citizenId, pageable);
-        return ResponseEntity.ok(ApiResult.ok(PagedData.from(response)));
+        return ResponseEntity.ok(PageResponse.from(response));
     }
 
     @GetMapping("/requests/{id}")
@@ -130,8 +156,10 @@ public class CitizenRescueController {
 
     @PostMapping("/attachments")
     public ResponseEntity<ApiResult<List<AttachmentUploadResponse>>> uploadAttachments(
-            @RequestParam("files") List<MultipartFile> files
+            @RequestParam(value = "files", required = false) List<MultipartFile> files,
+            @RequestParam(value = "attachments", required = false) List<MultipartFile> attachments
     ) throws IOException {
-        return ResponseEntity.ok(ApiResult.ok("Tải file lên thành công", rescueRequestService.uploadAttachments(files)));
+        List<MultipartFile> uploadFiles = (files != null && !files.isEmpty()) ? files : attachments;
+        return ResponseEntity.ok(ApiResult.ok("Tải file lên thành công", rescueRequestService.uploadAttachments(uploadFiles)));
     }
 }

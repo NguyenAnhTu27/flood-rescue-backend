@@ -182,12 +182,18 @@ public class IssueService {
         if (issue.getStatus() != InventoryDocumentStatus.APPROVED) {
             throw new BusinessException("Chỉ có thể trả hàng khi phiếu đang ở trạng thái APPROVED");
         }
+        List<InventoryIssueLineEntity> lines = issueLineRepository.findByIssue(issue);
+        if (lines.isEmpty()) {
+            throw new BusinessException("Phiếu xuất không có dòng nào");
+        }
+
+        stockService.restoreIssue(lines);
+
         String old = issue.getNote() == null ? "" : issue.getNote();
         String extra = (reason == null || reason.isBlank()) ? "Đội cứu hộ trả hàng về kho." : ("Đội cứu hộ trả hàng về kho. Lý do: " + reason.trim());
         issue.setNote((old + "\n" + extra).trim());
         issue.setStatus(InventoryDocumentStatus.CANCELLED);
         issue = issueRepository.save(issue);
-        List<InventoryIssueLineEntity> lines = issueLineRepository.findByIssue(issue);
         return toResponse(issue, lines);
     }
 

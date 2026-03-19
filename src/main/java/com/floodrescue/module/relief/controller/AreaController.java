@@ -1,6 +1,7 @@
 package com.floodrescue.module.relief.controller;
 
 import com.floodrescue.module.relief.dto.response.AreaResponse;
+import com.floodrescue.shared.dto.ApiResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,7 +25,7 @@ public class AreaController {
      * - GET /api/locations
      */
     @GetMapping({"/areas", "/relief/areas", "/manager/areas", "/locations"})
-    public ResponseEntity<List<AreaResponse>> getAreas() {
+    public ResponseEntity<ApiResult<List<AreaResponse>>> getAreas() {
         List<AreaResponse> areas = Arrays.asList(
                 AreaResponse.builder().id(1).name("Huyện Lệ Thủy, Quảng Bình").build(),
                 AreaResponse.builder().id(2).name("Thị xã Ba Đồn, Quảng Bình").build(),
@@ -32,6 +33,6 @@ public class AreaController {
                 AreaResponse.builder().id(4).name("Huyện Hương Khê, Hà Tĩnh").build(),
                 AreaResponse.builder().id(5).name("Huyện Kỳ Anh, Hà Tĩnh").build()
         );
-        return ResponseEntity.ok(areas);
+        return ResponseEntity.ok(ApiResult.ok(areas));
     }
 }

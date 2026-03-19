@@ -29,6 +29,7 @@ public class RescueRequestMapper {
                 .priority(entity.getPriority())
                 .affectedPeopleCount(entity.getAffectedPeopleCount())
                 .description(entity.getDescription())
+                .phone(entity.getContactPhone() != null ? entity.getContactPhone() : entity.getCitizen().getPhone())
                 .addressText(entity.getAddressText())
                 .latitude(entity.getLatitude())
                 .longitude(entity.getLongitude())

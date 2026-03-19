@@ -45,6 +45,19 @@ public class SystemFeedbackEntity {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "deleted", nullable = false)
+    @Builder.Default
+    private Boolean deleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @Column(name = "deleted_by_user_id")
+    private Long deletedByUserId;
+
+    @Column(name = "delete_reason", length = 500)
+    private String deleteReason;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

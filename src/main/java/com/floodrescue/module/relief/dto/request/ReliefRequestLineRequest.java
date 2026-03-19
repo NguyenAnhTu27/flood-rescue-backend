@@ -14,7 +14,7 @@ public class ReliefRequestLineRequest {
     private Integer itemCategoryId;
 
     @NotNull(message = "Số lượng không được để trống")
-    @Min(value = 0, message = "Số lượng phải lớn hơn 0")
+    @Min(value = 1, message = "Số lượng phải lớn hơn 0")
     private Double qty;
 
     @NotBlank(message = "Đơn vị tính không được để trống")

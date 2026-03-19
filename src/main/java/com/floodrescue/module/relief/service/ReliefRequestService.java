@@ -19,6 +19,7 @@ import com.floodrescue.module.rescue.entity.RescueRequestEntity;
 import com.floodrescue.module.rescue.repository.RescueRequestRepository;
 import com.floodrescue.shared.enums.InventoryDocumentStatus;
 import com.floodrescue.shared.enums.ReliefDeliveryStatus;
+import com.floodrescue.shared.enums.RescuePriority;
 import com.floodrescue.shared.exception.BusinessException;
 import com.floodrescue.shared.exception.NotFoundException;
 import com.floodrescue.shared.util.CodeGenerator;
@@ -70,6 +71,9 @@ public class ReliefRequestService {
                 .status(InventoryDocumentStatus.DRAFT)
                 .deliveryStatus(ReliefDeliveryStatus.REQUESTED)
                 .targetArea(request.getTargetArea().trim())
+            .phone(request.getPhone())
+            .priority(resolveReliefPriority(request.getPriority(), rescueRequest))
+            .peopleCount(resolveReliefPeopleCount(request.getPeopleCount(), rescueRequest))
                 .addressText(request.getAddressText())
                 .latitude(request.getLatitude())
                 .longitude(request.getLongitude())
@@ -81,6 +85,7 @@ public class ReliefRequestService {
         ReliefRequestEntity saved = reliefRequestRepository.save(relief);
 
         List<ReliefRequestLineEntity> lines = List.of();
+        // Allow null or empty lines; validation will be enforced at approval stage
         if (request.getLines() != null && !request.getLines().isEmpty()) {
             lines = request.getLines().stream()
                     .map(lineReq -> {
@@ -109,8 +114,9 @@ public class ReliefRequestService {
         }
 
         List<ReliefRequestLineEntity> lines = reliefRequestLineRepository.findByReliefRequest(relief);
-        if (lines.isEmpty()) {
-            throw new BusinessException("Yêu cầu cứu trợ không có mặt hàng");
+        // Validate: lines must be provided at approval time
+        if (lines == null || lines.isEmpty()) {
+            throw new BusinessException("Yêu cầu cứu trợ phải có ít nhất 1 mặt hàng trước khi duyệt");
         }
 
         InventoryIssueCreateRequest issueRequest = new InventoryIssueCreateRequest();
@@ -180,6 +186,9 @@ public class ReliefRequestService {
         }
 
         relief.setTargetArea(request.getTargetArea().trim());
+        relief.setPhone(request.getPhone());
+        relief.setPriority(resolveReliefPriority(request.getPriority(), rescueRequest));
+        relief.setPeopleCount(resolveReliefPeopleCount(request.getPeopleCount(), rescueRequest));
         relief.setAddressText(request.getAddressText());
         relief.setLatitude(request.getLatitude());
         relief.setLongitude(request.getLongitude());
@@ -300,6 +309,13 @@ public class ReliefRequestService {
             }
         }
 
+        boolean requiresIssue = status == ReliefDeliveryStatus.ARRIVED_RELIEF_POINT
+                || status == ReliefDeliveryStatus.COMPLETED
+                || status == ReliefDeliveryStatus.RETURNED_TO_WAREHOUSE;
+        if (requiresIssue && issue == null) {
+            throw new BusinessException("Yêu cầu cứu trợ chưa được gắn phiếu xuất kho, không thể cập nhật trạng thái này");
+        }
+
         if (issue != null) {
             if (status == ReliefDeliveryStatus.ARRIVED_RELIEF_POINT && issue.getStatus() == InventoryDocumentStatus.DRAFT) {
                 issueService.markIssueTemporaryDeduction(issue.getId(), rescuerUserId);
@@ -359,10 +375,7 @@ public class ReliefRequestService {
             throw new BusinessException("Không thể duyệt yêu cầu cứu trợ ở trạng thái " + relief.getStatus());
         }
 
-        relief.setStatus(InventoryDocumentStatus.APPROVED);
-        relief = reliefRequestRepository.save(relief);
-
-        return toResponse(relief, lines);
+        throw new BusinessException("Vui lòng dùng API /requests/{id}/approve-dispatch để duyệt và phân công đội cứu hộ");
     }
 
     @Transactional
@@ -468,6 +481,18 @@ public class ReliefRequestService {
                 .createdByName(createdBy != null ? createdBy.getFullName() : null)
                 .createdByPhone(createdBy != null ? createdBy.getPhone() : null)
                 .rescueRequestId(rescueRequestId)
+            .phone(
+                relief.getPhone() != null ? relief.getPhone()
+                    : (rescue != null && rescue.getCitizen() != null ? rescue.getCitizen().getPhone() : null)
+            )
+            .priority(
+                relief.getPriority() != null ? relief.getPriority()
+                    : (rescue != null ? rescue.getPriority() : RescuePriority.MEDIUM)
+            )
+            .peopleCount(
+                relief.getPeopleCount() != null ? relief.getPeopleCount()
+                    : (rescue != null ? rescue.getAffectedPeopleCount() : null)
+            )
                 .citizenAddressText(
                         relief.getAddressText() != null ? relief.getAddressText()
                                 : (rescue != null ? rescue.getAddressText() : null)
@@ -494,6 +519,26 @@ public class ReliefRequestService {
                 .updatedAt(relief.getUpdatedAt())
                 .lines(responseLines)
                 .build();
+    }
+
+    private RescuePriority resolveReliefPriority(RescuePriority requestPriority, RescueRequestEntity rescueRequest) {
+        if (requestPriority != null) {
+            return requestPriority;
+        }
+        if (rescueRequest != null && rescueRequest.getPriority() != null) {
+            return rescueRequest.getPriority();
+        }
+        return RescuePriority.MEDIUM;
+    }
+
+    private Integer resolveReliefPeopleCount(Integer requestPeopleCount, RescueRequestEntity rescueRequest) {
+        if (requestPeopleCount != null) {
+            return requestPeopleCount;
+        }
+        if (rescueRequest != null) {
+            return rescueRequest.getAffectedPeopleCount();
+        }
+        return null;
     }
 
     private Page<ReliefRequestResponse> mapPageWithLines(Page<ReliefRequestEntity> page) {

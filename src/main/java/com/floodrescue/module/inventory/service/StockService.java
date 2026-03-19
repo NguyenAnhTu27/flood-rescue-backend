@@ -3,6 +3,7 @@ package com.floodrescue.module.inventory.service;
 import com.floodrescue.module.inventory.entity.InventoryIssueLineEntity;
 import com.floodrescue.module.inventory.entity.InventoryReceiptEntity;
 import com.floodrescue.module.inventory.entity.InventoryReceiptLineEntity;
+import com.floodrescue.module.inventory.entity.ItemCategoryEntity;
 import com.floodrescue.module.inventory.entity.StockBalanceEntity;
 import com.floodrescue.module.inventory.repository.StockBalanceRepository;
 import com.floodrescue.shared.enums.StockSourceType;
@@ -64,6 +65,34 @@ public class StockService {
                 remaining = remaining.subtract(toUse);
                 stockBalanceRepository.save(b);
             }
+        }
+    }
+
+    @Transactional
+    public void restoreIssue(java.util.List<InventoryIssueLineEntity> lines) {
+        for (InventoryIssueLineEntity line : lines) {
+            BigDecimal qty = line.getQty();
+            if (qty == null || qty.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            ItemCategoryEntity category = line.getItemCategory();
+            var balances = stockBalanceRepository.findByItemCategory(category);
+
+            // We do not track source-level deduction per issue line, so restore to an existing bucket first.
+            StockBalanceEntity targetBalance;
+            if (!balances.isEmpty()) {
+                targetBalance = balances.get(0);
+            } else {
+                targetBalance = stockBalanceRepository
+                        .findByItemCategoryAndSourceType(category, StockSourceType.DONATION)
+                        .orElseGet(() -> StockBalanceEntity.builder()
+                                .itemCategory(category)
+                                .sourceType(StockSourceType.DONATION)
+                                .qty(BigDecimal.ZERO)
+                                .build());
+            }
+
+            targetBalance.setQty(targetBalance.getQty().add(qty));
+            stockBalanceRepository.save(targetBalance);
         }
     }
 }

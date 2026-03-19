@@ -63,11 +63,12 @@ public class ReliefRequestController {
     }
 
     /**
-     * Tạo yêu cầu cứu trợ mới.
-     * FE có thể gọi: POST /api/relief/requests
+     * Tạo yêu cầu cứu trợ mới (Manager ONLY).
+     * FE gọi: POST /api/relief/requests
+     * Citizen không thể tự tạo yêu cầu cứu trợ.
      */
     @PostMapping("/requests")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CITIZEN')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public ResponseEntity<ApiResult<ReliefRequestResponse>> createReliefRequest(
             @Valid @RequestBody ReliefRequestCreateRequest request,
             Authentication authentication

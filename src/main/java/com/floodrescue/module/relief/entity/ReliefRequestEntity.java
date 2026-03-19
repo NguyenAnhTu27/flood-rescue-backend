@@ -3,6 +3,7 @@ package com.floodrescue.module.relief.entity;
 import com.floodrescue.module.rescue.entity.RescueRequestEntity;
 import com.floodrescue.shared.enums.InventoryDocumentStatus;
 import com.floodrescue.shared.enums.ReliefDeliveryStatus;
+import com.floodrescue.shared.enums.RescuePriority;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -43,6 +44,17 @@ public class ReliefRequestEntity {
 
     @Column(name = "target_area", nullable = false, length = 255)
     private String targetArea;
+
+        @Column(name = "phone", length = 20)
+        private String phone;
+
+        @Enumerated(EnumType.STRING)
+        @Column(name = "priority", length = 10)
+        @Builder.Default
+        private RescuePriority priority = RescuePriority.MEDIUM;
+
+        @Column(name = "people_count")
+        private Integer peopleCount;
 
     @Column(name = "address_text", length = 255)
     private String addressText;
