@@ -9,5 +9,4 @@ public class FloodRescueBackendApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(FloodRescueBackendApplication.class, args);
 	}
-
 }

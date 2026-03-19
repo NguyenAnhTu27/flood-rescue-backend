@@ -2,6 +2,7 @@ package com.floodrescue.module.rescue.dto.request;
 
 import com.floodrescue.shared.enums.AttachmentFileType;
 import com.floodrescue.shared.enums.RescuePriority;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -24,9 +25,13 @@ public class RescueRequestCreateRequest {
     private String addressText;
 
     @NotNull(message = "Vĩ độ không được để trống")
+    @DecimalMin(value = "-90.0", message = "Vĩ độ phải lớn hơn hoặc bằng -90")
+    @DecimalMax(value = "90.0", message = "Vĩ độ phải nhỏ hơn hoặc bằng 90")
     private Double latitude;
 
     @NotNull(message = "Kinh độ không được để trống")
+    @DecimalMin(value = "-180.0", message = "Kinh độ phải lớn hơn hoặc bằng -180")
+    @DecimalMax(value = "180.0", message = "Kinh độ phải nhỏ hơn hoặc bằng 180")
     private Double longitude;
 
     @Size(max = 500, message = "Mô tả vị trí không được vượt quá 500 ký tự")
@@ -35,6 +40,7 @@ public class RescueRequestCreateRequest {
     @NotNull(message = "Mức độ ưu tiên không được để trống")
     private RescuePriority priority;
 
+    @Valid
     private List<AttachmentRequest> attachments;
 
     @Getter

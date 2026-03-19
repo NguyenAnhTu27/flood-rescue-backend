@@ -2,6 +2,7 @@ package com.floodrescue.module.rescue.dto.request;
 
 import com.floodrescue.shared.enums.AttachmentFileType;
 import com.floodrescue.shared.enums.RescuePriority;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -23,6 +24,7 @@ public class RescueRequestUpdateRequest {
 
     private RescuePriority priority;
 
+    @Valid
     private List<AttachmentRequest> attachments;
 
     @Getter

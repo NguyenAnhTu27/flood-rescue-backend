@@ -4,6 +4,7 @@ import com.floodrescue.module.notification.dto.NotificationResponse;
 import com.floodrescue.module.notification.dto.OverloadEmergencyRequest;
 import com.floodrescue.module.notification.dto.QueueEmergencyRequest;
 import com.floodrescue.module.notification.service.NotificationService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -63,7 +64,7 @@ public class NotificationController {
     @PostMapping("/{id}/queue")
     public ResponseEntity<?> queueEmergency(
             @PathVariable Long id,
-            @RequestBody(required = false) QueueEmergencyRequest request,
+            @Valid @RequestBody(required = false) QueueEmergencyRequest request,
             Authentication authentication
     ) {
         Long userId = getCurrentUserId(authentication);
@@ -78,7 +79,7 @@ public class NotificationController {
 
     @PostMapping("/emergency/overload")
     public ResponseEntity<?> overloadEmergency(
-            @RequestBody OverloadEmergencyRequest request,
+            @Valid @RequestBody OverloadEmergencyRequest request,
             Authentication authentication
     ) {
         Long userId = getCurrentUserId(authentication);
