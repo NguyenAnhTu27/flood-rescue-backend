@@ -1,6 +1,7 @@
 package com.floodrescue.module.asset.dto.response;
 
 import com.floodrescue.shared.enums.AssetStatus;
+import com.floodrescue.shared.enums.AssetType;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -14,7 +15,7 @@ public class AssetResponse {
     private Long id;
     private String code;
     private String name;
-    private String assetType;
+    private AssetType assetType;
     private AssetStatus status;
     private Integer capacity;
 

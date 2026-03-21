@@ -1,10 +1,11 @@
 package com.floodrescue.module.relief.service;
 
-import com.floodrescue.module.asset.repository.AssetReponsitory;
+import com.floodrescue.module.asset.repository.AssetRepository;
 import com.floodrescue.module.relief.dto.response.ManagerReliefDispatchDashboardResponse;
-import com.floodrescue.module.relief.reponsitory.ReliefRequestRepository;
+import com.floodrescue.module.relief.repository.ReliefRequestRepository;
 import com.floodrescue.module.team.repository.TeamRepository;
 import com.floodrescue.shared.enums.AssetStatus;
+import com.floodrescue.shared.enums.AssetType;
 import com.floodrescue.shared.enums.InventoryDocumentStatus;
 import com.floodrescue.shared.enums.ReliefDeliveryStatus;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -24,7 +26,7 @@ public class ManagerReliefDispatchDashboardService {
 
     private final ReliefRequestRepository reliefRequestRepository;
     private final TeamRepository teamRepository;
-    private final AssetReponsitory assetRepository;
+    private final AssetRepository assetRepository;
 
     @Transactional(readOnly = true)
     public ManagerReliefDispatchDashboardResponse getDashboard() {
@@ -70,7 +72,7 @@ public class ManagerReliefDispatchDashboardService {
                         .build())
                 .toList();
 
-        var vehicles = assetRepository.findAll().stream()
+        List<ManagerReliefDispatchDashboardResponse.VehicleItem> vehicles = assetRepository.findAll().stream()
                 .map(a -> ManagerReliefDispatchDashboardResponse.VehicleItem.builder()
                         .id(a.getId())
                         .code(a.getCode())
@@ -82,7 +84,7 @@ public class ManagerReliefDispatchDashboardService {
                         .location(a.getNote())
                         .online(a.getStatus() != AssetStatus.INACTIVE)
                         .build())
-                .toList();
+                .collect(Collectors.toList());
 
         return ManagerReliefDispatchDashboardResponse.builder()
                 .requests(queue)
@@ -121,13 +123,12 @@ public class ManagerReliefDispatchDashboardService {
         return days + "d trước";
     }
 
-    private String mapAssetType(String assetType) {
+    private String mapAssetType(AssetType assetType) {
         if (assetType == null) return "boat";
-        String t = assetType.trim().toUpperCase();
-        return switch (t) {
-            case "CANO" -> "cano";
-            case "HELICOPTER" -> "helicopter";
-            case "BOAT" -> "boat";
+        return switch (assetType) {
+            case CANO -> "cano";
+            case HELICOPTER -> "helicopter";
+            case BOAT -> "boat";
             default -> "boat";
         };
     }

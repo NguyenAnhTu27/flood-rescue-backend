@@ -110,7 +110,7 @@ public class SeedDataRunner implements ApplicationRunner {
         // Ensure roles exist
         ensureRole("CITIZEN", "Công dân");
         RoleEntity coordinatorRole = ensureRole("COORDINATOR", "Điều phối");
-        ensureRole("RESCUER", "Đội cứu hộ");
+        RoleEntity rescuerRole = ensureRole("RESCUER", "Đội cứu hộ");
         RoleEntity managerRole = ensureRole("MANAGER", "Quản lý");
         RoleEntity adminRole = ensureRole("ADMIN", "Admin");
 
@@ -120,8 +120,6 @@ public class SeedDataRunner implements ApplicationRunner {
         seedManagerUser(managerRole);
 
         // Seed team accounts (RESCUER role) - cần có team trước
-        RoleEntity rescuerRole = roleRepository.findByCode("RESCUER")
-                .orElseThrow(() -> new RuntimeException("Role RESCUER không tồn tại"));
         seedTeamUsers(rescuerRole);
     }
 
@@ -138,10 +136,13 @@ public class SeedDataRunner implements ApplicationRunner {
     }
 
     private void seedAdminUser(RoleEntity adminRole) {
-        boolean exists = (adminEmail != null && !adminEmail.isBlank()
-                && userRepository.existsByEmail(adminEmail.trim().toLowerCase()))
-                || (adminPhone != null && !adminPhone.isBlank()
-                && userRepository.existsByPhone(adminPhone.trim()));
+        String email = normalizeEmail(adminEmail);
+        String phone = normalizePhone(adminPhone);
+        if (email == null && phone == null) {
+            return;
+        }
+
+        boolean exists = userExistsByEmailOrPhone(email, phone);
         if (exists) {
             return;
         }
@@ -152,8 +153,8 @@ public class SeedDataRunner implements ApplicationRunner {
                 .role(adminRole)
                 .teamId(null)
                 .fullName(adminFullName)
-                .phone(adminPhone)
-                .email(adminEmail == null ? null : adminEmail.trim().toLowerCase())
+                .phone(phone)
+                .email(email)
                 .passwordHash(passwordEncoder.encode(adminPassword))
                 .status((byte) 1)
                 .createdAt(now)
@@ -164,10 +165,13 @@ public class SeedDataRunner implements ApplicationRunner {
     }
 
     private void seedCoordinatorUser(RoleEntity coordinatorRole) {
-        boolean exists = (coordinatorEmail != null && !coordinatorEmail.isBlank()
-                && userRepository.existsByEmail(coordinatorEmail.trim().toLowerCase()))
-                || (coordinatorPhone != null && !coordinatorPhone.isBlank()
-                && userRepository.existsByPhone(coordinatorPhone.trim()));
+        String email = normalizeEmail(coordinatorEmail);
+        String phone = normalizePhone(coordinatorPhone);
+        if (email == null && phone == null) {
+            return;
+        }
+
+        boolean exists = userExistsByEmailOrPhone(email, phone);
         if (exists) {
             return;
         }
@@ -178,8 +182,8 @@ public class SeedDataRunner implements ApplicationRunner {
                 .role(coordinatorRole)
                 .teamId(null)
                 .fullName(coordinatorFullName)
-                .phone(coordinatorPhone)
-                .email(coordinatorEmail == null ? null : coordinatorEmail.trim().toLowerCase())
+                .phone(phone)
+                .email(email)
                 .passwordHash(passwordEncoder.encode(coordinatorPassword))
                 .status((byte) 1)
                 .createdAt(now)
@@ -190,10 +194,13 @@ public class SeedDataRunner implements ApplicationRunner {
     }
 
     private void seedManagerUser(RoleEntity managerRole) {
-        boolean exists = (managerEmail != null && !managerEmail.isBlank()
-                && userRepository.existsByEmail(managerEmail.trim().toLowerCase()))
-                || (managerPhone != null && !managerPhone.isBlank()
-                && userRepository.existsByPhone(managerPhone.trim()));
+        String email = normalizeEmail(managerEmail);
+        String phone = normalizePhone(managerPhone);
+        if (email == null && phone == null) {
+            return;
+        }
+
+        boolean exists = userExistsByEmailOrPhone(email, phone);
         if (exists) {
             return;
         }
@@ -204,8 +211,8 @@ public class SeedDataRunner implements ApplicationRunner {
                 .role(managerRole)
                 .teamId(null)
                 .fullName(managerFullName)
-                .phone(managerPhone)
-                .email(managerEmail == null ? null : managerEmail.trim().toLowerCase())
+                .phone(phone)
+                .email(email)
                 .passwordHash(passwordEncoder.encode(managerPassword))
                 .status((byte) 1)
                 .createdAt(now)
@@ -244,9 +251,12 @@ public class SeedDataRunner implements ApplicationRunner {
                     String code = CodeGenerator.generateTeamCode();
                     // Đảm bảo code unique
                     int attempts = 0;
-                    while (teamRepository.existsByCode(code) && attempts < 10) {
+                    while (teamRepository.existsByCode(code) && attempts < 20) {
                         code = CodeGenerator.generateTeamCode();
                         attempts++;
+                    }
+                    if (teamRepository.existsByCode(code)) {
+                        throw new IllegalStateException("Không thể tạo mã team unique cho " + name);
                     }
 
                     TeamEntity team = TeamEntity.builder()
@@ -262,9 +272,14 @@ public class SeedDataRunner implements ApplicationRunner {
      * Seed 1 user RESCUER gán vào team.
      */
     private void seedTeamUser(RoleEntity rescuerRole, Long teamId, String phone, String email, String password, String fullName) {
+        String normalizedEmail = normalizeEmail(email);
+        String normalizedPhone = normalizePhone(phone);
+        if (normalizedEmail == null && normalizedPhone == null) {
+            return;
+        }
+
         // Check xem đã tồn tại user với phone hoặc email này chưa
-        boolean exists = (phone != null && !phone.isBlank() && userRepository.existsByPhone(phone.trim()))
-                || (email != null && !email.isBlank() && userRepository.existsByEmail(email.trim().toLowerCase()));
+        boolean exists = userExistsByEmailOrPhone(normalizedEmail, normalizedPhone);
         if (exists) {
             return;
         }
@@ -275,14 +290,36 @@ public class SeedDataRunner implements ApplicationRunner {
                 .role(rescuerRole)
                 .teamId(teamId) // Gán vào team
                 .fullName(fullName)
-                .phone(phone)
-                .email(email == null ? null : email.trim().toLowerCase()) // Set email
+                .phone(normalizedPhone)
+                .email(normalizedEmail) // Set email
                 .passwordHash(passwordEncoder.encode(password))
                 .status((byte) 1)
+                .isLeader(true)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
 
         userRepository.save(user);
+    }
+
+    private boolean userExistsByEmailOrPhone(String email, String phone) {
+        return (email != null && userRepository.existsByEmail(email))
+                || (phone != null && userRepository.existsByPhone(phone));
+    }
+
+    private String normalizeEmail(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String normalized = raw.trim().toLowerCase();
+        return normalized.isBlank() ? null : normalized;
+    }
+
+    private String normalizePhone(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String normalized = raw.trim();
+        return normalized.isBlank() ? null : normalized;
     }
 }

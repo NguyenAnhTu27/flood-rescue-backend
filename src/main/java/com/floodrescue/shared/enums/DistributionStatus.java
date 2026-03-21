@@ -1,4 +1,8 @@
 package com.floodrescue.shared.enums;
 
-public class DistributionStatus {
+public enum DistributionStatus {
+    PLANNED,
+    IN_TRANSIT,
+    DELIVERED,
+    CANCELLED
 }
