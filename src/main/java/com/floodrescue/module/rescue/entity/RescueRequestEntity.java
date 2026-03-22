@@ -70,6 +70,7 @@ public class RescueRequestEntity {
     @Column(name = "longitude")
     private Double longitude;
 
+
     @Column(name = "location_description", length = 500)
     private String locationDescription;
 

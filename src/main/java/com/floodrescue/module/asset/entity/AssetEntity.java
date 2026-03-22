@@ -2,6 +2,7 @@ package com.floodrescue.module.asset.entity;
 
 import com.floodrescue.module.team.entity.TeamEntity;
 import com.floodrescue.shared.enums.AssetStatus;
+import com.floodrescue.shared.enums.AssetType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -34,8 +35,9 @@ public class AssetEntity {
     @Column(nullable = false, length = 120)
     private String name;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "asset_type", nullable = false, length = 50)
-    private String assetType;
+    private AssetType assetType;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

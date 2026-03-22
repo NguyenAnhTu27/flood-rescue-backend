@@ -1,7 +1,9 @@
 package com.floodrescue.module.asset.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.floodrescue.shared.enums.AssetType;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -15,9 +17,9 @@ public class CreateAssetRequest {
     @NotBlank(message = "Tên phương tiện không được để trống")
     private String name;
 
-    @NotBlank(message = "Loại phương tiện không được để trống")
+    @NotNull(message = "Loại phương tiện không được để trống")
     @JsonAlias({"asset_type", "type"})
-    private String assetType;
+    private AssetType assetType;
 
     private Integer capacity;
 
