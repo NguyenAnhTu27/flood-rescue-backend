@@ -1,12 +1,16 @@
 package com.floodrescue.shared.exception;
 
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.*;
-import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.*;
+import com.floodrescue.shared.util.TextNormalizationUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @RestControllerAdvice
 @Slf4j
@@ -15,14 +19,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<?> handleBusiness(BusinessException ex) {
         return ResponseEntity.badRequest().body(Map.of(
-                "message", ex.getMessage()
+                "message", TextNormalizationUtil.cleanDisplayText(ex.getMessage())
         ));
     }
 
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<?> handleUnauthorized(UnauthorizedException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
-                "message", ex.getMessage()
+                "message", TextNormalizationUtil.cleanDisplayText(ex.getMessage())
+        ));
+    }
+
+    @ExceptionHandler(NotFoundException.class)
+    public ResponseEntity<?> handleNotFound(NotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                "message", TextNormalizationUtil.cleanDisplayText(ex.getMessage())
         ));
     }
 
@@ -30,7 +41,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<?> handleValidation(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new LinkedHashMap<>();
         ex.getBindingResult().getFieldErrors()
-                .forEach(e -> errors.put(e.getField(), e.getDefaultMessage()));
+                .forEach(error -> errors.put(error.getField(), TextNormalizationUtil.cleanDisplayText(error.getDefaultMessage())));
         return ResponseEntity.badRequest().body(Map.of(
                 "message", "Dữ liệu không hợp lệ",
                 "errors", errors

@@ -1,17 +1,20 @@
-    package com.floodrescue.module.auth.controller;
+package com.floodrescue.module.auth.controller;
 
 import com.floodrescue.module.auth.dto.request.LoginRequest;
 import com.floodrescue.module.auth.dto.request.RegisterCitizenRequest;
 import com.floodrescue.module.auth.dto.response.LoginResponse;
 import com.floodrescue.module.auth.service.AuthService;
-import com.floodrescue.module.user.entity.UserEntity;
-import com.floodrescue.module.user.repository.UserRepository;
+import com.floodrescue.module.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
@@ -21,7 +24,7 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
-    private final UserRepository userRepository;
+    private final UserService userService;
 
     private Long getCurrentUserId(Authentication authentication) {
         if (authentication == null || authentication.getPrincipal() == null) {
@@ -34,7 +37,7 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> registerCitizen(@Valid @RequestBody RegisterCitizenRequest req) {
         authService.registerCitizen(req);
-        return ResponseEntity.ok(Map.of("message", "Đăng ký Citizen thành công"));
+        return ResponseEntity.ok(Map.of("message", "Đăng ký tài khoản công dân thành công"));
     }
 
     @PostMapping("/login")
@@ -48,21 +51,6 @@ public class AuthController {
         if (userId == null) {
             return ResponseEntity.status(401).body(Map.of("message", "Unauthorized"));
         }
-        UserEntity user = userRepository.findById(userId)
-                .orElse(null);
-        if (user == null) {
-            return ResponseEntity.status(404).body(Map.of("message", "User not found"));
-        }
-
-        String role = user.getRole() != null ? user.getRole().getCode() : null;
-        return ResponseEntity.ok(Map.of(
-                "id", user.getId(),
-                "fullName", user.getFullName() == null ? "" : user.getFullName(),
-                "phone", user.getPhone() == null ? "" : user.getPhone(),
-                "email", user.getEmail() == null ? "" : user.getEmail(),
-                "role", role == null ? "" : role,
-                "rescueRequestBlocked", Boolean.TRUE.equals(user.getRescueRequestBlocked()),
-                "rescueRequestBlockedReason", user.getRescueRequestBlockedReason() == null ? "" : user.getRescueRequestBlockedReason()
-        ));
+        return ResponseEntity.ok(userService.getMyProfile(userId));
     }
 }
