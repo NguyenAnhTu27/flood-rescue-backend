@@ -1,7 +1,5 @@
 package com.floodrescue.module.rescue.service;
 
-import com.floodrescue.module.map.dto.GeocodingResponse;
-import com.floodrescue.module.map.service.MapboxService;
 import com.floodrescue.module.notification.entity.NotificationEntity;
 import com.floodrescue.module.notification.repository.NotificationRepository;
 import com.floodrescue.module.rescue.dto.request.*;
@@ -28,7 +26,6 @@ import com.floodrescue.shared.exception.BusinessException;
 import com.floodrescue.shared.exception.NotFoundException;
 import com.floodrescue.shared.util.CodeGenerator;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -42,7 +39,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RescueRequestServiceImpl implements RescueRequestService {
@@ -52,7 +48,6 @@ public class RescueRequestServiceImpl implements RescueRequestService {
     private final RescueTimelineRepository timelineRepository;
     private final UserRepository userRepository;
     private final RescueRequestMapper mapper;
-    private final MapboxService mapboxService;
     private final NotificationService notificationService;
     private final NotificationRepository notificationRepository;
     private final TaskGroupRequestRepository taskGroupRequestRepository;
@@ -79,18 +74,6 @@ public class RescueRequestServiceImpl implements RescueRequestService {
                 .locationDescription(request.getLocationDescription())
                 .locationVerified(false)
                 .build();
-
-        // Auto-geocode if lat/lng not provided but addressText is available
-        if (entity.getLatitude() == null && entity.getLongitude() == null
-                && entity.getAddressText() != null && !entity.getAddressText().isBlank()) {
-            try {
-                GeocodingResponse geo = mapboxService.geocode(entity.getAddressText());
-                entity.setLatitude(geo.getLatitude());
-                entity.setLongitude(geo.getLongitude());
-            } catch (Exception e) {
-                log.warn("Auto-geocode failed for address '{}': {}", entity.getAddressText(), e.getMessage());
-            }
-        }
 
         final RescueRequestEntity savedEntity = rescueRequestRepository.save(entity);
 
@@ -217,7 +200,6 @@ public class RescueRequestServiceImpl implements RescueRequestService {
         if (!entity.getCitizen().getId().equals(citizenId)) {
             throw new BusinessException("Bạn không có quyền chỉnh sửa yêu cầu cứu hộ này");
         }
-        assertRequestOutcomeNotFinalized(entity, "chỉnh sửa");
 
         // Check if can be updated
         if (entity.getStatus() == RescueRequestStatus.COMPLETED ||
@@ -273,7 +255,6 @@ public class RescueRequestServiceImpl implements RescueRequestService {
     public RescueRequestResponse verifyRescueRequest(Long id, Long coordinatorId, VerifyRequest request) {
         RescueRequestEntity entity = rescueRequestRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Yêu cầu cứu hộ không tồn tại"));
-        assertRequestOutcomeNotFinalized(entity, "xác minh");
 
         if (entity.getStatus() != RescueRequestStatus.PENDING) {
             throw new BusinessException("Chỉ có thể xác minh yêu cầu ở trạng thái PENDING");
@@ -377,7 +358,6 @@ public class RescueRequestServiceImpl implements RescueRequestService {
     public RescueRequestResponse prioritizeRescueRequest(Long id, Long coordinatorId, PrioritizeRequest request) {
         RescueRequestEntity entity = rescueRequestRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Yêu cầu cứu hộ không tồn tại"));
-        assertRequestOutcomeNotFinalized(entity, "thay đổi mức độ ưu tiên");
 
         RescuePriority oldPriority = entity.getPriority();
         entity.setPriority(request.getPriority());
@@ -395,7 +375,6 @@ public class RescueRequestServiceImpl implements RescueRequestService {
     public RescueRequestResponse markAsDuplicate(Long id, Long coordinatorId, MarkDuplicateRequest request) {
         RescueRequestEntity entity = rescueRequestRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Yêu cầu cứu hộ không tồn tại"));
-        assertRequestOutcomeNotFinalized(entity, "đánh dấu trùng lặp");
 
         RescueRequestEntity masterRequest = rescueRequestRepository.findById(request.getMasterRequestId())
                 .orElseThrow(() -> new NotFoundException("Yêu cầu cứu hộ chính không tồn tại"));
@@ -433,7 +412,6 @@ public class RescueRequestServiceImpl implements RescueRequestService {
     public RescueRequestResponse changeStatus(Long id, Long userId, RescueRequestStatus newStatus, String note) {
         RescueRequestEntity entity = rescueRequestRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Yêu cầu cứu hộ không tồn tại"));
-        assertRequestOutcomeNotFinalized(entity, "đổi trạng thái");
 
         RescueRequestStatus oldStatus = entity.getStatus();
         entity.setStatus(newStatus);
@@ -463,9 +441,6 @@ public class RescueRequestServiceImpl implements RescueRequestService {
         if (original.getStatus() != RescueRequestStatus.COMPLETED) {
             throw new BusinessException("Chỉ có thể xác nhận khi yêu cầu đã ở trạng thái COMPLETED");
         }
-        if (hasCitizenConfirmedRescueOutcome(original)) {
-            throw new BusinessException("Yêu cầu này đã được công dân xác nhận kết quả cứu hộ");
-        }
         if (rescued == null) {
             throw new BusinessException("Thiếu thông tin xác nhận đã được cứu hộ hay chưa");
         }
@@ -474,9 +449,6 @@ public class RescueRequestServiceImpl implements RescueRequestService {
                 .orElseThrow(() -> new NotFoundException("Người dùng không tồn tại"));
 
         if (Boolean.TRUE.equals(rescued)) {
-            RescueRequestStatus oldStatus = original.getStatus();
-            original.setStatus(RescueRequestStatus.COMPLETED);
-            original.setWaitingForTeam(false);
             original.setRescueResultConfirmationStatus("RESCUED");
             original.setRescueResultConfirmationNote(
                     (reason == null || reason.isBlank()) ? "Citizen xác nhận đã được cứu hộ an toàn." : reason.trim());
@@ -490,28 +462,6 @@ public class RescueRequestServiceImpl implements RescueRequestService {
                     null,
                     null,
                     "Citizen xác nhận: đã được cứu hộ an toàn."
-            );
-
-            if (oldStatus != RescueRequestStatus.COMPLETED) {
-                createTimelineEntry(
-                        original,
-                        citizen,
-                        TimelineEventType.STATUS_CHANGE,
-                        oldStatus,
-                        RescueRequestStatus.COMPLETED,
-                        "Citizen xác nhận kết quả cứu hộ thành công."
-                );
-            }
-
-            notificationService.notifyRole(
-                    "COORDINATOR",
-                    "Citizen xác nhận đã được cứu hộ",
-                    "Citizen đã xác nhận yêu cầu " + original.getCode() + " đã hoàn thành ngoài thực tế.",
-                    "CITIZEN_CONFIRMED_RESCUED",
-                    "RESCUE_REQUEST",
-                    original.getId(),
-                    false,
-                    null
             );
 
             return CitizenRescueConfirmationResponse.builder()
@@ -606,7 +556,6 @@ public class RescueRequestServiceImpl implements RescueRequestService {
         if (!entity.getCitizen().getId().equals(citizenId)) {
             throw new BusinessException("Bạn không có quyền hủy yêu cầu cứu hộ này");
         }
-        assertRequestOutcomeNotFinalized(entity, "hủy");
 
         if (entity.getStatus() == RescueRequestStatus.COMPLETED ||
                 entity.getStatus() == RescueRequestStatus.CANCELLED) {
@@ -841,13 +790,6 @@ public class RescueRequestServiceImpl implements RescueRequestService {
         if (entity == null || entity.getId() == null) {
             return entity;
         }
-        if (hasCitizenConfirmedRescueOutcome(entity)) {
-            if (entity.getStatus() == RescueRequestStatus.COMPLETED) {
-                return entity;
-            }
-            entity.setStatus(RescueRequestStatus.COMPLETED);
-            return rescueRequestRepository.save(entity);
-        }
         List<TaskGroupRequestEntity> links = taskGroupRequestRepository.findByRescueRequestId(entity.getId());
         if (links == null || links.isEmpty()) {
             return entity;
@@ -992,23 +934,6 @@ public class RescueRequestServiceImpl implements RescueRequestService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private boolean hasCitizenConfirmedRescueOutcome(RescueRequestEntity entity) {
-        if (entity == null) {
-            return false;
-        }
-        String confirmationStatus = normalizeText(entity.getRescueResultConfirmationStatus());
-        return "RESCUED".equalsIgnoreCase(confirmationStatus)
-                || "NOT_RESCUED".equalsIgnoreCase(confirmationStatus);
-    }
-
-    private void assertRequestOutcomeNotFinalized(RescueRequestEntity entity, String actionName) {
-        if (hasCitizenConfirmedRescueOutcome(entity)) {
-            throw new BusinessException(
-                    "Yêu cầu này đã được công dân xác nhận kết quả cứu hộ, không thể " + actionName
-            );
-        }
     }
 
     private void validateCitizenCanCreateRequest(UserEntity citizen) {
