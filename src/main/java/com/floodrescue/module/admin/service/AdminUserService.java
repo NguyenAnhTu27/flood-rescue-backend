@@ -4,6 +4,11 @@ import com.floodrescue.module.admin.dto.request.AdminCreateUserRequest;
 import com.floodrescue.module.admin.dto.request.AdminResetPasswordRequest;
 import com.floodrescue.module.admin.dto.request.AdminUpdateUserRequest;
 import com.floodrescue.module.admin.dto.request.AdminUpdateUserStatusRequest;
+import com.floodrescue.module.user.entity.UserEntity;
+import com.floodrescue.module.user.repository.UserRepository;
+import com.floodrescue.shared.exception.NotFoundException;
+import com.floodrescue.shared.util.PhoneUtil;
+import com.floodrescue.shared.util.TextNormalizationUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -11,7 +16,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,66 +27,34 @@ public class AdminUserService {
     private final JdbcTemplate jdbcTemplate;
     private final PasswordEncoder passwordEncoder;
     private final AuditLogService auditLogService;
+    private final UserRepository userRepository;
 
     public Map<String, Object> getUsers(int page, int size, String keyword, Integer roleId) {
         int safeSize = Math.max(1, Math.min(size, 100));
         int safePage = Math.max(0, page);
         int offset = safePage * safeSize;
+        String normalizedKeyword = keyword == null ? "" : TextNormalizationUtil.cleanDisplayText(keyword).trim().toLowerCase();
 
-        StringBuilder where = new StringBuilder(" WHERE 1=1 ");
-        List<Object> params = new ArrayList<>();
+        List<UserEntity> filtered = userRepository.findAllWithRoleOrderByIdDesc().stream()
+                .filter(user -> roleId == null || (user.getRole() != null && roleId.equals(user.getRole().getId())))
+                .filter(user -> matchesKeyword(user, normalizedKeyword))
+                .toList();
 
-        if (roleId != null) {
-            where.append(" AND u.role_id = ? ");
-            params.add(roleId);
-        }
-        if (keyword != null && !keyword.trim().isEmpty()) {
-            where.append(" AND (u.full_name LIKE ? OR u.email LIKE ? OR u.phone LIKE ? OR CAST(u.id AS CHAR) LIKE ?) ");
-            String like = "%" + keyword.trim() + "%";
-            params.add(like);
-            params.add(like);
-            params.add(like);
-            params.add(like);
-        }
+        long totalUsers = filtered.size();
+        List<Map<String, Object>> users = filtered.stream()
+                .skip(offset)
+                .limit(safeSize)
+                .map(this::toUserRow)
+                .toList();
 
-        Long totalUsers = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM users u " + where,
-                Long.class,
-                params.toArray()
-        );
-
-        List<Object> queryParams = new ArrayList<>(params);
-        queryParams.add(safeSize);
-        queryParams.add(offset);
-
-        List<Map<String, Object>> users = jdbcTemplate.query(
-                "SELECT u.id, u.full_name, u.email, u.phone, u.status, u.role_id, r.code AS role_code, u.created_at " +
-                        "FROM users u JOIN roles r ON r.id = u.role_id " +
-                        where +
-                        " ORDER BY u.id DESC LIMIT ? OFFSET ?",
-                (rs, rowNum) -> {
-                    Map<String, Object> item = new HashMap<>();
-                    item.put("id", rs.getLong("id"));
-                    item.put("fullName", rs.getString("full_name"));
-                    item.put("email", rs.getString("email"));
-                    item.put("phone", rs.getString("phone"));
-                    item.put("status", rs.getInt("status") == 1 ? "ACTIVE" : "LOCKED");
-                    item.put("roleId", rs.getInt("role_id"));
-                    item.put("role", rs.getString("role_code"));
-                    item.put("createdAt", rs.getTimestamp("created_at"));
-                    return item;
-                },
-                queryParams.toArray()
-        );
-
-        int totalPages = (int) Math.ceil((totalUsers == null ? 0 : totalUsers) / (double) safeSize);
+        int totalPages = (int) Math.ceil(totalUsers / (double) safeSize);
         if (totalPages <= 0) {
             totalPages = 1;
         }
 
         Map<String, Object> response = new HashMap<>();
         response.put("users", users);
-        response.put("totalUsers", totalUsers == null ? 0 : totalUsers);
+        response.put("totalUsers", totalUsers);
         response.put("totalPages", totalPages);
         response.put("page", safePage);
         return response;
@@ -93,12 +65,12 @@ public class AdminUserService {
             Long actorId,
             HttpServletRequest request
     ) {
-        String fullName = payload.getFullName().trim();
+        String fullName = TextNormalizationUtil.cleanDisplayText(payload.getFullName()).trim();
         String email = normalizeOptional(payload.getEmail());
         if (email != null) {
             email = email.toLowerCase();
         }
-        String phone = normalizeOptional(payload.getPhone());
+        String phone = normalizeOptionalPhone(payload.getPhone());
 
         if (email != null) {
             Integer existed = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users WHERE email = ?", Integer.class, email);
@@ -120,7 +92,19 @@ public class AdminUserService {
                 passwordEncoder.encode(payload.getPassword())
         );
 
-        auditLogService.writeAudit(actorId, "CREATE_USER", "USER", null, "SUCCESS", "Tạo tài khoản mới", email, request, null, payload);
+        Long createdUserId = jdbcTemplate.queryForObject("SELECT MAX(id) FROM users", Long.class);
+        auditLogService.writeAudit(
+                actorId,
+                "CREATE_USER",
+                "USER",
+                createdUserId,
+                "SUCCESS",
+                "Tạo tài khoản mới",
+                email,
+                request,
+                null,
+                sanitizePayloadForAudit(payload)
+        );
         return ResponseEntity.ok(Map.of("message", "Tạo tài khoản thành công"));
     }
 
@@ -130,21 +114,22 @@ public class AdminUserService {
             Long actorId,
             HttpServletRequest request
     ) {
-        Map<String, Object> before = jdbcTemplate.queryForMap("SELECT * FROM users WHERE id = ?", id);
+        UserEntity beforeUser = findUser(id);
+        Map<String, Object> before = toAuditUserSnapshot(beforeUser);
 
         String fullName = payload.getFullName() == null
-                ? String.valueOf(before.get("full_name"))
-                : payload.getFullName().trim();
+                ? beforeUser.getFullName()
+                : TextNormalizationUtil.cleanDisplayText(payload.getFullName()).trim();
         String email = payload.getEmail() == null ? null : normalizeOptional(payload.getEmail());
         if (email != null) {
             email = email.toLowerCase();
         }
-        String phone = payload.getPhone() == null ? null : normalizeOptional(payload.getPhone());
+        String phone = payload.getPhone() == null ? null : normalizeOptionalPhone(payload.getPhone());
         Integer roleId = payload.getRoleId() == null
-                ? ((Number) before.get("role_id")).intValue()
+                ? beforeUser.getRole().getId()
                 : payload.getRoleId();
         String status = payload.getStatus() == null
-                ? (((Number) before.get("status")).intValue() == 1 ? "ACTIVE" : "LOCKED")
+                ? (beforeUser.getStatus() == 1 ? "ACTIVE" : "LOCKED")
                 : payload.getStatus().trim().toUpperCase();
         int statusVal = "ACTIVE".equalsIgnoreCase(status) ? 1 : 0;
 
@@ -176,15 +161,27 @@ public class AdminUserService {
                 fullName, email, phone, roleId, statusVal, id
         );
 
-        auditLogService.writeAudit(actorId, "UPDATE_USER", "USER", id, "SUCCESS", "Cập nhật thông tin người dùng", email, request, before, payload);
+        auditLogService.writeAudit(
+                actorId,
+                "UPDATE_USER",
+                "USER",
+                id,
+                "SUCCESS",
+                "Cập nhật thông tin người dùng",
+                email,
+                request,
+                before,
+                sanitizePayloadForAudit(payload)
+        );
         return ResponseEntity.ok(Map.of("message", "Cập nhật người dùng thành công"));
     }
 
     public ResponseEntity<Map<String, Object>> deleteUser(Long id, Long actorId, HttpServletRequest request) {
-        Map<String, Object> before = jdbcTemplate.queryForMap("SELECT * FROM users WHERE id = ?", id);
+        UserEntity beforeUser = findUser(id);
+        Map<String, Object> before = toAuditUserSnapshot(beforeUser);
         jdbcTemplate.update("DELETE FROM users WHERE id = ?", id);
         auditLogService.writeAudit(actorId, "DELETE_USER", "USER", id, "WARN", "Xóa tài khoản", String.valueOf(before.get("email")), request, before, null);
-        return ResponseEntity.ok(Map.of("message", "Đã xoá user"));
+        return ResponseEntity.ok(Map.of("message", "Đã xóa user"));
     }
 
     public ResponseEntity<Map<String, Object>> resetPassword(
@@ -221,5 +218,91 @@ public class AdminUserService {
         }
         String normalized = value.trim();
         return normalized.isEmpty() ? null : normalized;
+    }
+
+    private String normalizeOptionalPhone(String value) {
+        String normalized = normalizeOptional(value);
+        if (normalized == null) {
+            return null;
+        }
+        String phone = PhoneUtil.normalize(normalized);
+        return phone != null ? phone : normalized;
+    }
+
+    private boolean matchesKeyword(UserEntity user, String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return true;
+        }
+        String searchable = String.join(" ",
+                TextNormalizationUtil.cleanDisplayText(user.getFullName()),
+                user.getEmail() == null ? "" : user.getEmail(),
+                user.getPhone() == null ? "" : user.getPhone(),
+                user.getRole() == null ? "" : user.getRole().getCode(),
+                String.valueOf(user.getId())
+        ).toLowerCase();
+        return searchable.contains(keyword);
+    }
+
+    private Map<String, Object> toUserRow(UserEntity user) {
+        Map<String, Object> item = new HashMap<>();
+        item.put("id", user.getId());
+        item.put("fullName", TextNormalizationUtil.cleanDisplayText(user.getFullName()));
+        item.put("email", user.getEmail());
+        item.put("phone", user.getPhone());
+        item.put("status", user.getStatus() == 1 ? "ACTIVE" : "LOCKED");
+        item.put("roleId", user.getRole() != null ? user.getRole().getId() : null);
+        item.put("role", user.getRole() != null ? user.getRole().getCode() : null);
+        item.put("createdAt", user.getCreatedAt());
+        return item;
+    }
+
+    private UserEntity findUser(Long id) {
+        return userRepository.findByIdWithRole(id)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng"));
+    }
+
+    private Map<String, Object> toAuditUserSnapshot(UserEntity user) {
+        Map<String, Object> snapshot = new HashMap<>();
+        snapshot.put("id", user.getId());
+        snapshot.put("fullName", TextNormalizationUtil.cleanDisplayText(user.getFullName()));
+        snapshot.put("email", user.getEmail());
+        snapshot.put("phone", user.getPhone());
+        snapshot.put("roleId", user.getRole() != null ? user.getRole().getId() : null);
+        snapshot.put("role", user.getRole() != null ? user.getRole().getCode() : null);
+        snapshot.put("status", user.getStatus() == 1 ? "ACTIVE" : "LOCKED");
+        snapshot.put("teamId", user.getTeamId());
+        snapshot.put("isLeader", user.getIsLeader());
+        snapshot.put("createdAt", user.getCreatedAt());
+        snapshot.put("updatedAt", user.getUpdatedAt());
+        snapshot.put("lastLoginAt", user.getLastLoginAt());
+        snapshot.put("rescueRequestBlocked", user.getRescueRequestBlocked());
+        snapshot.put("rescueRequestBlockedReason", TextNormalizationUtil.cleanDisplayText(user.getRescueRequestBlockedReason()));
+        return snapshot;
+    }
+
+    private Map<String, Object> sanitizePayloadForAudit(AdminCreateUserRequest payload) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("fullName", TextNormalizationUtil.cleanDisplayText(payload.getFullName()));
+        result.put("email", normalizeOptional(payload.getEmail()));
+        result.put("phone", normalizeOptionalPhone(payload.getPhone()));
+        result.put("roleId", payload.getRoleId());
+        result.put("teamId", payload.getTeamId());
+        result.put("contactProvided", payload.isContactProvided());
+        result.put("emailValidIfPresent", payload.isEmailValidIfPresent());
+        result.put("phoneValidIfPresent", payload.isPhoneValidIfPresent());
+        return result;
+    }
+
+    private Map<String, Object> sanitizePayloadForAudit(AdminUpdateUserRequest payload) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("fullName", payload.getFullName() == null ? null : TextNormalizationUtil.cleanDisplayText(payload.getFullName()));
+        result.put("email", normalizeOptional(payload.getEmail()));
+        result.put("phone", normalizeOptionalPhone(payload.getPhone()));
+        result.put("roleId", payload.getRoleId());
+        result.put("status", payload.getStatus());
+        result.put("emailValidIfPresent", payload.isEmailValidIfPresent());
+        result.put("phoneValidIfPresent", payload.isPhoneValidIfPresent());
+        result.put("fullNameValidIfPresent", payload.isFullNameValidIfPresent());
+        return result;
     }
 }
