@@ -44,6 +44,7 @@ public class CoordinatorDashboardServiceImpl implements CoordinatorDashboardServ
                         .status(r.getStatus() != null ? r.getStatus().name() : null)
                         .waitingForTeam(r.getWaitingForTeam())
                         .timeAgo(formatTimeAgo(r.getCreatedAt()))
+                        .citizenPhone(r.getCitizen() != null ? r.getCitizen().getPhone() : null)
                         .lat(r.getLatitude())
                         .lng(r.getLongitude())
                         .build())

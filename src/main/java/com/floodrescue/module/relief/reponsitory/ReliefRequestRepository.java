@@ -10,7 +10,5 @@ public interface ReliefRequestRepository extends JpaRepository<ReliefRequestEnti
 
     Page<ReliefRequestEntity> findByStatus(InventoryDocumentStatus status, Pageable pageable);
 
-    Page<ReliefRequestEntity> findByCreatedByIdOrderByCreatedAtDesc(Long createdById, Pageable pageable);
-
     Page<ReliefRequestEntity> findByAssignedTeamIdOrderByUpdatedAtDesc(Long assignedTeamId, Pageable pageable);
 }

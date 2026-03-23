@@ -26,6 +26,7 @@ public class CoordinatorDashboardResponse {
         private String timeAgo;      // "1p trước"
         private String status;       // PENDING/VERIFIED/...
         private Boolean waitingForTeam;
+        private String citizenPhone;
         // Map sẽ làm sau => để null
         private Double lat;
         private Double lng;

@@ -64,7 +64,7 @@ public class ReliefRequestController {
      * FE có thể gọi: POST /api/relief/requests
      */
     @PostMapping("/requests")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CITIZEN')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public ResponseEntity<ReliefRequestResponse> createReliefRequest(
             @Valid @RequestBody ReliefRequestCreateRequest request,
             Authentication authentication
@@ -77,7 +77,7 @@ public class ReliefRequestController {
      * Lấy chi tiết yêu cầu cứu trợ.
      */
     @GetMapping("/requests/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CITIZEN','RESCUER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','RESCUER')")
     public ResponseEntity<ReliefRequestResponse> getReliefRequest(@PathVariable Long id) {
         return ResponseEntity.ok(reliefRequestService.getReliefRequest(id));
     }
@@ -95,42 +95,9 @@ public class ReliefRequestController {
     }
 
     @GetMapping("/requests/generate-code")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','CITIZEN')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public ResponseEntity<Map<String, String>> generateReliefRequestCode() {
         return ResponseEntity.ok(Map.of("code", CodeGenerator.generateInventoryReceiptCode()));
-    }
-
-    @GetMapping("/citizen/requests")
-    @PreAuthorize("hasRole('CITIZEN')")
-    public ResponseEntity<Page<ReliefRequestResponse>> listMyReliefRequests(
-            @PageableDefault(size = 20) Pageable pageable,
-            Authentication authentication
-    ) {
-        Long userId = getCurrentUserId(authentication);
-        return ResponseEntity.ok(reliefRequestService.listMyReliefRequests(userId, pageable));
-    }
-
-    @PutMapping("/citizen/requests/{id}")
-    @PreAuthorize("hasRole('CITIZEN')")
-    public ResponseEntity<ReliefRequestResponse> updateCitizenReliefRequest(
-            @PathVariable Long id,
-            @Valid @RequestBody ReliefRequestCreateRequest request,
-            Authentication authentication
-    ) {
-        Long userId = getCurrentUserId(authentication);
-        return ResponseEntity.ok(reliefRequestService.updateCitizenReliefRequest(id, userId, request));
-    }
-
-    @DeleteMapping("/citizen/requests/{id}")
-    @PreAuthorize("hasRole('CITIZEN')")
-    public ResponseEntity<?> cancelCitizenReliefRequest(
-            @PathVariable Long id,
-            @RequestParam(required = false) String reason,
-            Authentication authentication
-    ) {
-        Long userId = getCurrentUserId(authentication);
-        reliefRequestService.cancelCitizenReliefRequest(id, userId, reason);
-        return ResponseEntity.ok(Map.of("message", "Yêu cầu cứu trợ đã được hủy"));
     }
 
     @PutMapping("/requests/{id}/approve-dispatch")
