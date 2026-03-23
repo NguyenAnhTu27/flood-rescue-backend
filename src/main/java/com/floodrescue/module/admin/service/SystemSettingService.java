@@ -2,6 +2,7 @@ package com.floodrescue.module.admin.service;
 
 import com.floodrescue.module.admin.dto.request.AdminContentPagesUpdateRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -11,22 +12,29 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SystemSettingService {
 
     private final JdbcTemplate jdbcTemplate;
 
     public Map<String, String> getAllSystemSettings() {
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT COALESCE(setting_key, key_name) AS k, COALESCE(setting_value, value_text) AS v FROM system_settings"
-        );
         Map<String, String> values = new HashMap<>();
-        for (Map<String, Object> row : rows) {
-            String key = row.get("k") == null ? null : String.valueOf(row.get("k"));
-            if (key == null || key.isBlank()) {
-                continue;
+
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    "SELECT COALESCE(setting_key, key_name) AS k, COALESCE(setting_value, value_text) AS v FROM system_settings"
+            );
+            for (Map<String, Object> row : rows) {
+                String key = row.get("k") == null ? null : String.valueOf(row.get("k"));
+                if (key == null || key.isBlank()) {
+                    continue;
+                }
+                values.put(key, row.get("v") == null ? "" : String.valueOf(row.get("v")));
             }
-            values.put(key, row.get("v") == null ? "" : String.valueOf(row.get("v")));
+        } catch (Exception ex) {
+            log.warn("Failed to load system settings from database", ex);
         }
+
         return values;
     }
 

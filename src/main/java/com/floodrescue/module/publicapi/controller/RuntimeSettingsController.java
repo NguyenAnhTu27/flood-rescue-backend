@@ -1,6 +1,7 @@
 package com.floodrescue.module.publicapi.controller;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +16,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/public")
 @RequiredArgsConstructor
+@Slf4j
 public class RuntimeSettingsController {
 
     private final JdbcTemplate jdbcTemplate;
@@ -37,31 +39,14 @@ public class RuntimeSettingsController {
         runtime.put("footerYoutubeUrl", "#");
         runtime.put("footerCopyright", "© 2024 Hệ thống Quản lý Cứu hộ - Cứu trợ. Bản quyền thuộc về Cơ quan chủ quản.");
 
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT COALESCE(setting_key, key_name) AS k, COALESCE(setting_value, value_text) AS v FROM system_settings"
-        );
-        for (Map<String, Object> row : rows) {
-            String key = row.get("k") == null ? null : String.valueOf(row.get("k"));
-            if (key == null || key.isBlank()) continue;
-            Object rawValue = row.get("v");
-            String value = rawValue == null ? "" : String.valueOf(rawValue);
-            runtime.put(key, value);
-        }
+        runtime.putAll(loadSystemSettingsSafely());
 
         return ResponseEntity.ok(runtime);
     }
 
     @GetMapping("/content-pages/{pageKey}")
     public ResponseEntity<Map<String, String>> getContentPage(@PathVariable String pageKey) {
-        Map<String, String> values = new HashMap<>();
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT COALESCE(setting_key, key_name) AS k, COALESCE(setting_value, value_text) AS v FROM system_settings"
-        );
-        for (Map<String, Object> row : rows) {
-            String key = row.get("k") == null ? null : String.valueOf(row.get("k"));
-            if (key == null || key.isBlank()) continue;
-            values.put(key, row.get("v") == null ? "" : String.valueOf(row.get("v")));
-        }
+        Map<String, String> values = loadSystemSettingsSafely();
 
         return switch (pageKey.toLowerCase()) {
             case "terms" -> ResponseEntity.ok(Map.of(
@@ -78,5 +63,29 @@ public class RuntimeSettingsController {
             ));
             default -> ResponseEntity.notFound().build();
         };
+    }
+
+    private Map<String, String> loadSystemSettingsSafely() {
+        Map<String, String> values = new HashMap<>();
+
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                    "SELECT COALESCE(setting_key, key_name) AS k, COALESCE(setting_value, value_text) AS v FROM system_settings"
+            );
+
+            for (Map<String, Object> row : rows) {
+                String key = row.get("k") == null ? null : String.valueOf(row.get("k"));
+                if (key == null || key.isBlank()) {
+                    continue;
+                }
+
+                Object rawValue = row.get("v");
+                values.put(key, rawValue == null ? "" : String.valueOf(rawValue));
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to load public runtime settings from system_settings; using defaults instead", ex);
+        }
+
+        return values;
     }
 }
