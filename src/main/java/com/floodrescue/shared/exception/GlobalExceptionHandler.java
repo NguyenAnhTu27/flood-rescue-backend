@@ -1,16 +1,12 @@
 package com.floodrescue.shared.exception;
 
-import com.floodrescue.shared.util.TextNormalizationUtil;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.annotation.*;
+import lombok.extern.slf4j.Slf4j;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 
 @RestControllerAdvice
 @Slf4j
@@ -19,21 +15,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<?> handleBusiness(BusinessException ex) {
         return ResponseEntity.badRequest().body(Map.of(
-                "message", TextNormalizationUtil.cleanDisplayText(ex.getMessage())
+                "message", ex.getMessage()
         ));
     }
 
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<?> handleUnauthorized(UnauthorizedException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
-                "message", TextNormalizationUtil.cleanDisplayText(ex.getMessage())
-        ));
-    }
-
-    @ExceptionHandler(NotFoundException.class)
-    public ResponseEntity<?> handleNotFound(NotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
-                "message", TextNormalizationUtil.cleanDisplayText(ex.getMessage())
+                "message", ex.getMessage()
         ));
     }
 
@@ -41,7 +30,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<?> handleValidation(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new LinkedHashMap<>();
         ex.getBindingResult().getFieldErrors()
-                .forEach(error -> errors.put(error.getField(), TextNormalizationUtil.cleanDisplayText(error.getDefaultMessage())));
+                .forEach(e -> errors.put(e.getField(), e.getDefaultMessage()));
         return ResponseEntity.badRequest().body(Map.of(
                 "message", "Dữ liệu không hợp lệ",
                 "errors", errors

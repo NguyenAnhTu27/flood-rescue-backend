@@ -2,7 +2,6 @@ package com.floodrescue.module.admin.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.floodrescue.shared.util.TextNormalizationUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -26,11 +25,11 @@ public class AuditLogService {
             return "SYSTEM";
         }
         try {
-            return TextNormalizationUtil.cleanDisplayText(jdbcTemplate.queryForObject(
+            return jdbcTemplate.queryForObject(
                     "SELECT full_name FROM users WHERE id = ?",
                     String.class,
                     userId
-            ));
+            );
         } catch (EmptyResultDataAccessException ex) {
             return "SYSTEM";
         }
@@ -61,18 +60,7 @@ public class AuditLogService {
         jdbcTemplate.update(
                 "INSERT INTO audit_logs(actor_id, action, entity_type, entity_id, old_data, new_data, ip_address, user_agent, created_at, actor, detail, level, target) " +
                         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?)",
-                actorId,
-                action,
-                entityType,
-                entityId,
-                oldJson,
-                newJson,
-                ip,
-                ua,
-                TextNormalizationUtil.cleanDisplayText(actor),
-                TextNormalizationUtil.cleanDisplayText(detail),
-                level,
-                TextNormalizationUtil.cleanDisplayText(target)
+                actorId, action, entityType, entityId, oldJson, newJson, ip, ua, actor, detail, level, target
         );
     }
 
@@ -106,10 +94,10 @@ public class AuditLogService {
                     item.put("id", rs.getLong("id"));
                     item.put("createdAt", rs.getTimestamp("created_at"));
                     item.put("action", rs.getString("action"));
-                    item.put("actor", TextNormalizationUtil.cleanDisplayText(rs.getString("actor")));
-                    item.put("target", TextNormalizationUtil.cleanDisplayText(rs.getString("target")));
+                    item.put("actor", rs.getString("actor"));
+                    item.put("target", rs.getString("target"));
                     item.put("level", rs.getString("level"));
-                    item.put("detail", TextNormalizationUtil.cleanDisplayText(rs.getString("detail")));
+                    item.put("detail", rs.getString("detail"));
                     return item;
                 },
                 queryParams.toArray()
