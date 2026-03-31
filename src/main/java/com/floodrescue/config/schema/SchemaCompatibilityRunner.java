@@ -1,5 +1,6 @@
 package com.floodrescue.config.schema;
 
+import com.floodrescue.shared.util.TextNormalizationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -9,6 +10,8 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+
+import java.util.Map;
 
 @Slf4j
 @Component
@@ -23,6 +26,7 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         try {
             alignUsersTable();
+            alignInventoryDocumentStatusEnums();
             alignTeamsTable();
             alignRescueRequestStatusEnums();
             alignRescueRequestEmergencyColumns();
@@ -33,7 +37,9 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
             alignSystemFeedbackTable();
             alignInventoryClassifications();
             alignInventoryUnits();
+            alignInventoryIssueRelations();
             alignReliefRequestWorkflow();
+            repairLegacyTextData();
             log.info("[SchemaCompatibility] Schema alignment completed");
         } catch (Exception e) {
             log.error("[SchemaCompatibility] Schema alignment failed: {}", e.getMessage(), e);
@@ -46,6 +52,18 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
             exec("ALTER TABLE users ADD COLUMN is_leader TINYINT(1) NOT NULL DEFAULT 0 AFTER status");
             log.info("[SchemaCompatibility] Added users.is_leader");
         }
+        if (!columnExists("users", "failed_login_attempts")) {
+            exec("ALTER TABLE users ADD COLUMN failed_login_attempts INT NULL DEFAULT 0 AFTER is_leader");
+            log.info("[SchemaCompatibility] Added users.failed_login_attempts");
+        }
+        if (!columnExists("users", "locked_at")) {
+            exec("ALTER TABLE users ADD COLUMN locked_at DATETIME(6) NULL AFTER failed_login_attempts");
+            log.info("[SchemaCompatibility] Added users.locked_at");
+        }
+        if (!columnExists("users", "temp_locked_until")) {
+            exec("ALTER TABLE users ADD COLUMN temp_locked_until DATETIME(6) NULL AFTER locked_at");
+            log.info("[SchemaCompatibility] Added users.temp_locked_until");
+        }
         if (!columnExists("users", "rescue_request_blocked")) {
             exec("ALTER TABLE users ADD COLUMN rescue_request_blocked TINYINT(1) NOT NULL DEFAULT 0 AFTER is_leader");
             log.info("[SchemaCompatibility] Added users.rescue_request_blocked");
@@ -54,6 +72,12 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
             exec("ALTER TABLE users ADD COLUMN rescue_request_blocked_reason TEXT NULL AFTER rescue_request_blocked");
             log.info("[SchemaCompatibility] Added users.rescue_request_blocked_reason");
         }
+    }
+
+    private void alignInventoryDocumentStatusEnums() {
+        alignInventoryDocumentStatus("relief_requests", "status", "DRAFT");
+        alignInventoryDocumentStatus("inventory_issues", "status", "DRAFT");
+        alignInventoryDocumentStatus("inventory_receipts", "status", "DRAFT");
     }
 
     private void alignTeamsTable() {
@@ -345,6 +369,50 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
                 """);
     }
 
+    private void alignInventoryIssueRelations() {
+        if (!columnExists("inventory_issues", "relief_request_id")) {
+            exec("ALTER TABLE inventory_issues ADD COLUMN relief_request_id BIGINT UNSIGNED NULL AFTER updated_at");
+        }
+        if (!columnExists("inventory_issues", "assigned_team_id")) {
+            exec("ALTER TABLE inventory_issues ADD COLUMN assigned_team_id BIGINT UNSIGNED NULL AFTER relief_request_id");
+        }
+        if (!columnExists("inventory_issues", "asset_id")) {
+            exec("ALTER TABLE inventory_issues ADD COLUMN asset_id BIGINT UNSIGNED NULL AFTER assigned_team_id");
+        }
+
+        if (!indexExists("inventory_issues", "idx_issue_relief")) {
+            exec("ALTER TABLE inventory_issues ADD INDEX idx_issue_relief (relief_request_id)");
+        }
+        if (!indexExists("inventory_issues", "idx_issue_team")) {
+            exec("ALTER TABLE inventory_issues ADD INDEX idx_issue_team (assigned_team_id)");
+        }
+        if (!indexExists("inventory_issues", "idx_issue_asset")) {
+            exec("ALTER TABLE inventory_issues ADD INDEX idx_issue_asset (asset_id)");
+        }
+
+        if (!constraintExists("inventory_issues", "fk_issue_relief")) {
+            try {
+                exec("ALTER TABLE inventory_issues ADD CONSTRAINT fk_issue_relief FOREIGN KEY (relief_request_id) REFERENCES relief_requests(id)");
+            } catch (Exception e) {
+                log.warn("[SchemaCompatibility] Skip adding fk_issue_relief: {}", e.getMessage());
+            }
+        }
+        if (!constraintExists("inventory_issues", "fk_issue_team")) {
+            try {
+                exec("ALTER TABLE inventory_issues ADD CONSTRAINT fk_issue_team FOREIGN KEY (assigned_team_id) REFERENCES teams(id)");
+            } catch (Exception e) {
+                log.warn("[SchemaCompatibility] Skip adding fk_issue_team: {}", e.getMessage());
+            }
+        }
+        if (!constraintExists("inventory_issues", "fk_issue_asset")) {
+            try {
+                exec("ALTER TABLE inventory_issues ADD CONSTRAINT fk_issue_asset FOREIGN KEY (asset_id) REFERENCES assets(id)");
+            } catch (Exception e) {
+                log.warn("[SchemaCompatibility] Skip adding fk_issue_asset: {}", e.getMessage());
+            }
+        }
+    }
+
     private void alignReliefRequestWorkflow() {
         if (!columnExists("relief_requests", "delivery_status")) {
             exec("ALTER TABLE relief_requests ADD COLUMN delivery_status VARCHAR(40) NOT NULL DEFAULT 'REQUESTED' AFTER status");
@@ -385,8 +453,106 @@ public class SchemaCompatibilityRunner implements ApplicationRunner {
         }
     }
 
+    private void repairLegacyTextData() {
+        repairKnownSystemSettings();
+        repairKnownUserNames();
+    }
+
+    private void repairKnownSystemSettings() {
+        Map<String, String> expectedSettings = Map.ofEntries(
+                Map.entry("footerBrandName", "QU\u1ea2N L\u00dd C\u1ee8U H\u1ed8"),
+                Map.entry("footerDescription", "H\u1ec7 th\u1ed1ng h\u1ed7 tr\u1ee3 c\u1ed9ng \u0111\u1ed3ng trong t\u00ecnh hu\u1ed1ng thi\u00ean tai kh\u1ea9n c\u1ea5p. Th\u00f4ng tin \u0111\u01b0\u1ee3c b\u1ea3o m\u1eadt v\u00e0 \u0111i\u1ec1u ph\u1ed1i theo quy \u0111\u1ecbnh c\u1ee7a c\u01a1 quan ch\u1ee9c n\u0103ng."),
+                Map.entry("footerTermsLabel", "\u0110i\u1ec1u kho\u1ea3n s\u1eed d\u1ee5ng"),
+                Map.entry("footerPrivacyLabel", "Ch\u00ednh s\u00e1ch b\u1ea3o m\u1eadt"),
+                Map.entry("footerSupportLabel", "Li\u00ean h\u1ec7 h\u1ed7 tr\u1ee3"),
+                Map.entry("footerCopyright", "\u00a9 2024 H\u1ec7 th\u1ed1ng Qu\u1ea3n l\u00fd C\u1ee9u h\u1ed9 - C\u1ee9u tr\u1ee3. B\u1ea3n quy\u1ec1n thu\u1ed9c v\u1ec1 C\u01a1 quan ch\u1ee7 qu\u1ea3n.")
+        );
+
+        for (Map.Entry<String, String> entry : expectedSettings.entrySet()) {
+            String currentValue = jdbcTemplate.query(
+                    """
+                            SELECT COALESCE(setting_value, value_text)
+                            FROM system_settings
+                            WHERE COALESCE(setting_key, key_name) = ?
+                            LIMIT 1
+                            """,
+                    rs -> rs.next() ? rs.getString(1) : null,
+                    entry.getKey()
+            );
+
+            if (!TextNormalizationUtil.isLikelyMojibake(currentValue)) {
+                continue;
+            }
+
+            jdbcTemplate.update(
+                    """
+                            UPDATE system_settings
+                            SET setting_value = ?, value_text = ?, updated_at = NOW()
+                            WHERE COALESCE(setting_key, key_name) = ?
+                            """,
+                    entry.getValue(),
+                    entry.getValue(),
+                    entry.getKey()
+            );
+            log.info("[SchemaCompatibility] Repaired mojibake system setting {}", entry.getKey());
+        }
+    }
+
+    private void repairKnownUserNames() {
+        Map<String, String> expectedUserNames = Map.ofEntries(
+                Map.entry("admin@gmail.com", "Qu\u1ea3n tr\u1ecb vi\u00ean h\u1ec7 th\u1ed1ng"),
+                Map.entry("conchimcu@gmail.com", "\u0110i\u1ec1u ph\u1ed1i vi\u00ean m\u1eb7c \u0111\u1ecbnh"),
+                Map.entry("manager@gmail.com", "Qu\u1ea3n l\u00fd h\u1ec7 th\u1ed1ng"),
+                Map.entry("team1@gmail.com", "\u0110\u1ed9i tr\u01b0\u1edfng \u0110\u1ed9i C\u1ee9u h\u1ed9 s\u1ed1 1"),
+                Map.entry("team2@gmail.com", "\u0110\u1ed9i tr\u01b0\u1edfng \u0110\u1ed9i C\u1ee9u h\u1ed9 s\u1ed1 2"),
+                Map.entry("team3@gmail.com", "\u0110\u1ed9i tr\u01b0\u1edfng \u0110\u1ed9i C\u1ee9u h\u1ed9 s\u1ed1 3"),
+                Map.entry("nguyenanhtu27@gmail.com", "L\u00f2 V\u0103n Chi")
+        );
+
+        for (Map.Entry<String, String> entry : expectedUserNames.entrySet()) {
+            String currentValue = jdbcTemplate.query(
+                    """
+                            SELECT full_name
+                            FROM users
+                            WHERE email = ?
+                            LIMIT 1
+                            """,
+                    rs -> rs.next() ? rs.getString(1) : null,
+                    entry.getKey()
+            );
+
+            if (!TextNormalizationUtil.isLikelyMojibake(currentValue)) {
+                continue;
+            }
+
+            jdbcTemplate.update(
+                    "UPDATE users SET full_name = ?, updated_at = NOW() WHERE email = ?",
+                    entry.getValue(),
+                    entry.getKey()
+            );
+            log.info("[SchemaCompatibility] Repaired mojibake user name for {}", entry.getKey());
+        }
+    }
+
     private void exec(String sql) {
         jdbcTemplate.execute(sql);
+    }
+
+    private void alignInventoryDocumentStatus(String tableName, String columnName, String defaultValue) {
+        String columnType = getColumnType(tableName, columnName);
+        if (columnType == null || columnType.contains("ASSIGNED")) {
+            return;
+        }
+
+        exec("ALTER TABLE " + tableName + " MODIFY " + columnName + " VARCHAR(20) NOT NULL");
+        exec("""
+                UPDATE %s
+                SET %s = '%s'
+                WHERE %s NOT IN ('DRAFT','APPROVED','ASSIGNED','DONE','CANCELLED')
+                """.formatted(tableName, columnName, defaultValue, columnName));
+        exec("ALTER TABLE " + tableName + " MODIFY " + columnName
+                + " ENUM('DRAFT','APPROVED','ASSIGNED','DONE','CANCELLED') NOT NULL DEFAULT '" + defaultValue + "'");
+        log.info("[SchemaCompatibility] Aligned {}.{} enum", tableName, columnName);
     }
 
     private boolean columnExists(String tableName, String columnName) {

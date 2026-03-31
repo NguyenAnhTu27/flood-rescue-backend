@@ -16,6 +16,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,8 +38,8 @@ public class AdminUserService {
         int offset = safePage * safeSize;
         String normalizedKeyword = keyword == null ? "" : TextNormalizationUtil.cleanDisplayText(keyword).trim().toLowerCase();
 
-        List<UserEntity> filtered = userRepository.findAllWithRoleOrderByIdDesc().stream()
-                .filter(user -> roleId == null || (user.getRole() != null && roleId.equals(user.getRole().getId())))
+        List<Map<String, Object>> filtered = loadUserRows().stream()
+                .filter(user -> roleId == null || roleId.equals(user.get("roleId")))
                 .filter(user -> matchesKeyword(user, normalizedKeyword))
                 .toList();
 
@@ -44,7 +47,6 @@ public class AdminUserService {
         List<Map<String, Object>> users = filtered.stream()
                 .skip(offset)
                 .limit(safeSize)
-                .map(this::toUserRow)
                 .toList();
 
         int totalPages = (int) Math.ceil(totalUsers / (double) safeSize);
@@ -58,6 +60,38 @@ public class AdminUserService {
         response.put("totalPages", totalPages);
         response.put("page", safePage);
         return response;
+    }
+
+    private List<Map<String, Object>> loadUserRows() {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
+                SELECT
+                    u.id,
+                    u.full_name,
+                    u.email,
+                    u.phone,
+                    u.status,
+                    u.created_at,
+                    r.id AS role_id,
+                    r.code AS role_code
+                FROM users u
+                JOIN roles r ON r.id = u.role_id
+                ORDER BY u.id DESC
+                """);
+
+        List<Map<String, Object>> users = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", toLong(row.get("id")));
+            item.put("fullName", TextNormalizationUtil.cleanDisplayText(stringValue(row.get("full_name"))));
+            item.put("email", stringValue(row.get("email")));
+            item.put("phone", stringValue(row.get("phone")));
+            item.put("status", toInt(row.get("status")) == 1 ? "ACTIVE" : "LOCKED");
+            item.put("roleId", toInt(row.get("role_id")));
+            item.put("role", stringValue(row.get("role_code")));
+            item.put("createdAt", toLocalDateTime(row.get("created_at")));
+            users.add(item);
+        }
+        return users;
     }
 
     public ResponseEntity<Map<String, Object>> createUser(
@@ -229,31 +263,18 @@ public class AdminUserService {
         return phone != null ? phone : normalized;
     }
 
-    private boolean matchesKeyword(UserEntity user, String keyword) {
+    private boolean matchesKeyword(Map<String, Object> user, String keyword) {
         if (keyword == null || keyword.isBlank()) {
             return true;
         }
         String searchable = String.join(" ",
-                TextNormalizationUtil.cleanDisplayText(user.getFullName()),
-                user.getEmail() == null ? "" : user.getEmail(),
-                user.getPhone() == null ? "" : user.getPhone(),
-                user.getRole() == null ? "" : user.getRole().getCode(),
-                String.valueOf(user.getId())
+                stringValue(user.get("fullName")),
+                stringValue(user.get("email")),
+                stringValue(user.get("phone")),
+                stringValue(user.get("role")),
+                stringValue(user.get("id"))
         ).toLowerCase();
         return searchable.contains(keyword);
-    }
-
-    private Map<String, Object> toUserRow(UserEntity user) {
-        Map<String, Object> item = new HashMap<>();
-        item.put("id", user.getId());
-        item.put("fullName", TextNormalizationUtil.cleanDisplayText(user.getFullName()));
-        item.put("email", user.getEmail());
-        item.put("phone", user.getPhone());
-        item.put("status", user.getStatus() == 1 ? "ACTIVE" : "LOCKED");
-        item.put("roleId", user.getRole() != null ? user.getRole().getId() : null);
-        item.put("role", user.getRole() != null ? user.getRole().getCode() : null);
-        item.put("createdAt", user.getCreatedAt());
-        return item;
     }
 
     private UserEntity findUser(Long id) {
@@ -304,5 +325,42 @@ public class AdminUserService {
         result.put("phoneValidIfPresent", payload.isPhoneValidIfPresent());
         result.put("fullNameValidIfPresent", payload.isFullNameValidIfPresent());
         return result;
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private Integer toInt(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        return Integer.parseInt(String.valueOf(value));
+    }
+
+    private Long toLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return Long.parseLong(String.valueOf(value));
+    }
+
+    private LocalDateTime toLocalDateTime(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof LocalDateTime localDateTime) {
+            return localDateTime;
+        }
+        if (value instanceof Timestamp timestamp) {
+            return timestamp.toLocalDateTime();
+        }
+        return LocalDateTime.parse(String.valueOf(value).replace(" ", "T"));
     }
 }
